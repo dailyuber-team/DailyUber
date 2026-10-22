@@ -34,11 +34,19 @@ Choisir le nombre de personnes (de 1 à 6, plusieurs valeurs possibles) :
 .venv\Scripts\python -m dailyuber.main --people 1 3 6
 ```
 
+Chercher pour plus tard (seuls les restaurants avec un créneau de livraison à cette heure sont gardés) :
+
+```bash
+.venv\Scripts\python -m dailyuber.main --at 12:30 --on demain
+```
+
 La première recherche prend environ 3 minutes. Les données sont ensuite gardées en cache pendant 30 minutes : les recherches suivantes sont instantanées.
 
 | Option | Effet |
 |---|---|
 | `--people N …` | Nombre(s) de personnes, de 1 à 6 |
+| `--at HH:MM` | Heure de livraison visée : aujourd'hui, ou demain si l'heure est passée (par défaut : maintenant) |
+| `--on JOUR` | Jour visé avec `--at` : `demain` ou une date `AAAA-MM-JJ` |
 | `--refresh` | Force une nouvelle récupération, même si le cache est récent |
 | `--offline` | Réutilise les dernières données, même si elles sont anciennes |
 | `--config chemin` | Utilise un autre fichier de configuration |
@@ -68,8 +76,9 @@ Tout se règle dans [config.yaml](config.yaml) :
 - **Les frais de service sont estimés** (10 % du panier, entre 0,99 € et 4,99 €) : Uber ne donne le montant exact qu'au paiement. Le prix réel peut donc varier un peu.
 - On ne se connecte jamais à un compte Uber. L'outil lit les données publiques du site, ce que les CGU d'Uber n'autorisent pas : à garder pour un usage perso et modéré.
 - Les promos « article offert » sont signalées mais pas comptées dans le prix.
+- Chaque offre indique jusqu'à quand le restaurant est ouvert, ou le créneau de livraison retenu. Pour une commande à l'avance, le menu et les prix sont ceux du moment de la recherche (une formule midi peut apparaître pour le soir).
 
 ## Pour aller plus loin
 
-- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (horaires d'ouverture, interface graphique, choix de zone, favoris, version téléphone).
+- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (interface graphique, choix de zone, favoris, version téléphone).
 - [CONTEXT.md](CONTEXT.md) : les détails techniques.
