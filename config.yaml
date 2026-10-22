@@ -1,0 +1,57 @@
+# Configuration de DailyUber. Les secrets (webhook Discord) vont dans .env, pas ici.
+
+address:
+  # Point central d'Aix-en-Provence (Cours Mirabeau). `reference` (ID Google Places)
+  # est optionnel : latitude/longitude suffisent pour que le flux soit correct.
+  label: "Cours Mirabeau, 13100 Aix-en-Provence"
+  latitude: 43.5266217
+  longitude: 5.447877
+  reference: "EipDciBNaXJhYmVhdSwgMTMxMDAgQWl4LWVuLVByb3ZlbmNlLCBGcmFuY2UiLiosChQKEgnLZxrRl43JEhGDes8JkrzvORIUChIJWRK5BKONyRIRo4i2yL5TuVw"
+
+fetch:
+  max_feed_pages: 3          # ~80-100 restaurants par page
+  max_stores: 40             # nombre max de menus récupérés (1 requête chacun)
+  min_delay_s: 2.0           # délai aléatoire entre deux requêtes
+  max_delay_s: 5.0
+  headless: true
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
+prefilter:
+  # Appliqué sur le flux, avant de télécharger les menus.
+  min_rating: 4.0            # les restaurants sans note sont gardés
+  max_eta_min: 45
+
+# Estimation des frais : Uber ne donne le montant exact qu'au checkout (compte requis).
+fees:
+  default_delivery_fee: 2.49   # utilisé si le flux n'affiche pas de frais de livraison
+  service_fee_pct: 0.10        # à calibrer sur une vraie commande
+  service_fee_min: 0.99
+  service_fee_max: 4.99
+  small_order_threshold: 8.00  # "2 EUR pour les commandes inférieures à 8 EUR" (texte Uber)
+  small_order_fee: 2.00
+
+# Définition d'un "repas" : un article compte comme plat principal si sa section
+# OU son titre contient un mot-clé "main", et ni l'un ni l'autre un mot-clé "exclude".
+meal:
+  min_item_price: 6.00         # sous ce prix, un article n'est pas un repas (ex. une empanada seule)
+  main_keywords: [plat, menu, formule, burger, pizza, tacos, kebab, bowl, poke, poké, sandwich,
+                  wrap, plateau, box, salade, pâtes, pasta, curry, bo bun, ramen, burrito,
+                  bagel, panini, tenders, sushi, maki, wok, riz, nouilles, signature, smash, crousty]
+  exclude_keywords: [boisson, drink, soda, coca, eau, bière, vin, dessert, glace, sauce,
+                     accompagnement, frite, side, supplément, extra, entrée, snack, enfant,
+                     kid, cookie, brownie, tiramisu, verrine, dip, nugget]
+
+selection:
+  group_sizes: [2, 4]
+  max_price_per_person: 10.00
+  top_n: 5
+  one_basket_per_store: true
+
+scoring:
+  # score = w_price * (1 - prix_pp / max_pp) + w_rating * note/5 + w_eta * (1 - eta / max_eta)
+  w_price: 0.6
+  w_rating: 0.25
+  w_eta: 0.15
+
+storage:
+  data_dir: data
