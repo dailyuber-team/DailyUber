@@ -54,7 +54,7 @@ Un outil perso qui parcourt les offres Uber Eats livrables autour d'Aix-en-Prove
 
 ## 4. État actuel du code (roadmap : phases 0 et 1 faites, en attente de validation)
 
-Dépôt GitHub privé : https://github.com/Anatole-1/DailyUber (branche `main`). Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
+Dépôt GitHub privé : https://github.com/dailyuber-team/DailyUber (branche `main`), dans l'organisation `dailyuber-team` (propriétaire : Anatole-1 ; collaboratrice emmagmzc, admin du dépôt). Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
 
 **Phases 0 et 1 :**
 - `dailyuber/engine.py` (`get_raw` avec cache de 30 min, `build_stores`, `select`) est le point d'entrée réutilisable par la future API.
