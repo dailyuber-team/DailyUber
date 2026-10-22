@@ -33,6 +33,7 @@ def format_basket(rank: int, b: Basket) -> str:
 
 def format_report(deals: dict[int, list[Basket]], stats: dict) -> str:
     out = [f"=== DailyUber — {stats['address']} ===",
+           f"Données du {stats['fetched_at'].replace('T', ' à ')} — "
            f"{stats['feed_stores']} restaurants dans le flux, {stats['fetched']} menus analysés, "
            f"{stats['open']} ouverts"]
     for people, baskets in deals.items():

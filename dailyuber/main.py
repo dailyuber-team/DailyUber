@@ -1,78 +1,46 @@
-"""Point d'entrée : python -m dailyuber.main [--offline]"""
+"""Point d'entrée CLI : python -m dailyuber.main [--refresh | --offline] [--people 1 3 6]"""
 import argparse
-import gzip
-import json
 import logging
 import sys
-from pathlib import Path
 
+from . import engine
 from .config import load_config
 from .history import mark_new_and_save
-from .models import Store
-from .parser import parse_feed_store, parse_store_details
 from .report import format_report
-from .selection import select_deals
 
 log = logging.getLogger("dailyuber")
 
 
-def prefilter(stores: list[Store], cfg: dict) -> list[Store]:
-    p = cfg["prefilter"]
-    kept = [s for s in stores
-            if (s.rating is None or s.rating >= p["min_rating"])
-            and (s.eta_max is None or s.eta_max <= p["max_eta_min"])]
-    # Les restaurants avec une promo affichée passent en premier, puis par note.
-    kept.sort(key=lambda s: (not s.signposts, -(s.rating or 0)))
-    return kept[: cfg["fetch"]["max_stores"]]
-
-
-def fetch_raw(cfg: dict) -> dict:
-    from .fetcher import UberEatsSession  # import tardif : --offline ne nécessite pas Playwright
-
-    raw = {"feed": [], "stores": {}}
-    with UberEatsSession(cfg) as session:
-        raw["feed"] = session.fetch_feed()
-        targets = prefilter([parse_feed_store(s) for s in raw["feed"]], cfg)
-        log.info("%d restaurants retenus pour récupérer le menu", len(targets))
-        for i, s in enumerate(targets, 1):
-            try:
-                raw["stores"][s.uuid] = session.fetch_store(s.uuid)
-                log.info("[%d/%d] %s", i, len(targets), s.title)
-            except Exception as e:  # un menu en échec ne doit pas faire tomber le run
-                log.warning("[%d/%d] %s : échec (%s)", i, len(targets), s.title, e)
-    if not raw["stores"]:
-        raise RuntimeError("Aucun menu récupéré")
-    return raw
-
-
-def run(cfg: dict, offline: bool) -> str:
-    raw_path = Path(cfg["storage"]["data_dir"]) / "raw" / "latest.json.gz"
+def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None) -> str:
     if offline:
-        raw = json.loads(gzip.decompress(raw_path.read_bytes()))
+        raw = engine.load_cached_raw(cfg)
+        if raw is None:
+            raise RuntimeError("Pas de données en cache : lancer sans --offline")
     else:
-        raw = fetch_raw(cfg)
-        raw_path.parent.mkdir(parents=True, exist_ok=True)
-        raw_path.write_bytes(gzip.compress(json.dumps(raw).encode()))
-
-    feed = {s.uuid: s for s in (parse_feed_store(r) for r in raw["feed"])}
-    stores = [parse_store_details(feed[uuid], data) for uuid, data in raw["stores"].items() if uuid in feed]
-    deals = select_deals(stores, cfg)
+        raw = engine.get_raw(cfg, refresh=refresh)
+    stores = engine.build_stores(raw)
+    deals = engine.select(stores, cfg, people)
     mark_new_and_save(deals, cfg["storage"]["data_dir"])
-    stats = {"address": cfg["address"]["label"], "feed_stores": len(feed),
-             "fetched": len(stores), "open": sum(s.is_open for s in stores)}
+    stats = {"address": cfg["address"]["label"], "fetched_at": raw.get("fetched_at", "?"),
+             "feed_stores": len(raw["feed"]), "fetched": len(stores),
+             "open": sum(s.is_open for s in stores)}
     return format_report(deals, stats)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Meilleurs deals Uber Eats du jour")
-    ap.add_argument("--offline", action="store_true", help="réutilise la dernière récupération (data/raw)")
+    src = ap.add_mutually_exclusive_group()
+    src.add_argument("--offline", action="store_true", help="réutilise la dernière récupération, quel que soit son âge")
+    src.add_argument("--refresh", action="store_true", help="force une nouvelle récupération même si le cache est récent")
+    ap.add_argument("--people", type=int, nargs="+", choices=range(1, 7), metavar="N",
+                    help="nombre(s) de personnes, de 1 à 6 (défaut : config.yaml)")
     ap.add_argument("--config", help="chemin vers config.yaml")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
     sys.stdout.reconfigure(encoding="utf-8")
     cfg = load_config(args.config)
     try:
-        print(run(cfg, args.offline))
+        print(run(cfg, args.offline, args.refresh, args.people))
     except Exception:
         log.exception("Échec du run")
         return 1

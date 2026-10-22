@@ -25,7 +25,7 @@
 
 ---
 
-## Phase 0 — Socle
+## Phase 0 — Socle ✅ (22/10/2026)
 - `git init` + premier commit.
 - Transformer `main.py` en bibliothèque : `fetch(zone, favoris) → données brutes` et `select(données, paramètres) → résultats`, réutilisables par l'API.
 - Cache des données brutes avec durée de validité.
@@ -33,8 +33,8 @@
 
 **Validé quand** : les commandes `--offline` et réelle donnent le même résultat qu'avant, et les tests passent.
 
-## Phase 1 — 1 à 6 personnes
-- Remplacer `combinations_with_replacement` (≈ 177 000 combinaisons par restaurant pour 6 personnes) par une **programmation dynamique** sur le nombre de plats. Elle doit garder, pour chaque nombre de plats, les meilleurs sous-totaux possibles, afin de rester exacte avec le 1+1, les promos à seuil, la petite commande et la livraison offerte sous condition.
+## Phase 1 — 1 à 6 personnes ✅ (22/10/2026)
+- `combinations_with_replacement` (≈ 177 000 combinaisons par restaurant pour 6 personnes) est remplacé par une **recherche avec élagage par seuil**. Le total ne dépend que du sous-total et croît avec lui, sauf aux seuils (promo, livraison offerte, petite commande). On cherche donc, pour chaque seuil, le plus petit sous-total qui l'atteint. C'est exact, vérifié contre une recherche exhaustive, et prend environ 15 ms pour 40 restaurants, même à 6 personnes.
 - Option **« varier les plats »** (au moins K plats différents), désactivée par défaut.
 - `group_sizes` devient un paramètre de requête (1 à 6) au lieu d'une liste figée.
 

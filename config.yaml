@@ -14,6 +14,7 @@ fetch:
   min_delay_s: 2.0           # délai aléatoire entre deux requêtes
   max_delay_s: 5.0
   headless: true
+  cache_max_age_min: 30      # au-delà, une nouvelle récupération est lancée
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
 prefilter:
@@ -45,7 +46,7 @@ selection:
   group_sizes: [2, 4]
   max_price_per_person: 10.00
   top_n: 5
-  one_basket_per_store: true
+  min_distinct_items: 1      # 2+ = imposer des plats différents dans le panier
 
 scoring:
   # score = w_price * (1 - prix_pp / max_pp) + w_rating * note/5 + w_eta * (1 - eta / max_eta)

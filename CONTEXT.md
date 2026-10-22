@@ -52,7 +52,17 @@ Un outil perso qui parcourt les offres Uber Eats livrables autour d'Aix-en-Prove
 - ⚠️ Dans le flux, `storeAvailablityState` valait `NOT_ACCEPTING_ORDERS` pour **tous** les restaurants, y compris les ouverts : ce champ **n'est pas fiable**. Il faut utiliser `isOpen`/`isOrderable` de `getStoreV1`.
 - Les autres champs liés aux horaires (`hours`, `adaptedDeliveryHoursInfos`) n'ont été observés qu'une fois, en journée. Il faut encore vérifier leur comportement **le soir et quand le restaurant est fermé**.
 
-## 4. État actuel du code (étape 1 terminée et validée en run réel)
+## 4. État actuel du code (roadmap : phases 0 et 1 faites, en attente de validation)
+
+Dépôt GitHub privé : https://github.com/Anatole-1/DailyUber (branche `main`). Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
+
+**Phases 0 et 1 :**
+- `dailyuber/engine.py` (`get_raw` avec cache de 30 min, `build_stores`, `select`) est le point d'entrée réutilisable par la future API.
+- CLI : `--refresh`, `--offline`, `--people 1..6`.
+- Nouvel algorithme exact (`_min_subtotal_lines` + seuils dans `best_basket`).
+- Option `selection.min_distinct_items`.
+- Fusion des doublons par enseigne normalisée (`brand_key`) ou par composition identique.
+- 37 tests.
 
 ```
 DailyUber/

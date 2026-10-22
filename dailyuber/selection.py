@@ -1,10 +1,10 @@
 """Composition des paniers, calcul des frais et des promos, filtrage et classement."""
 import re
-from itertools import combinations_with_replacement
+import unicodedata
 
 from .models import Basket, Item, Store
 
-MAX_CANDIDATES = 20  # plats les moins chers considérés par restaurant (plus tous les 1+1)
+MAX_CANDIDATES = 40  # plats les moins chers considérés par restaurant (plus tous les 1+1)
 
 
 def _kw_regex(keywords: list[str]) -> re.Pattern:
@@ -68,17 +68,11 @@ def best_threshold_discount(items_subtotal: float, store: Store) -> tuple[float,
     return best, ([best_label] if best_label else []) + gifts
 
 
-def build_basket(store: Store, people: int, combo: tuple[Item, ...], fees_cfg: dict) -> Basket:
-    counts: dict[int, int] = {}
-    for it in combo:
-        counts[id(it)] = counts.get(id(it), 0) + 1
-    by_id = {id(it): it for it in combo}
-    subtotal, promos, lines = 0.0, [], []
-    for iid, qty in counts.items():
-        it = by_id[iid]
+def build_basket(store: Store, people: int, lines: list[tuple[Item, int]], fees_cfg: dict) -> Basket:
+    subtotal, promos = 0.0, []
+    for it, qty in lines:
         cost, free = item_cost(it, qty)
         subtotal += cost
-        lines.append((it, qty))
         if free:
             promos.append(f"{it.bogo_buy} acheté = {it.bogo_get} offert : {it.title}")
         if it.original_price and it.original_price > it.price:
@@ -89,27 +83,80 @@ def build_basket(store: Store, people: int, combo: tuple[Item, ...], fees_cfg: d
     delivery, service, small = compute_fees(subtotal, store, fees_cfg)
     if delivery == 0:
         promos.append("Livraison offerte")
-    return Basket(store=store, people=people, lines=lines, items_subtotal=subtotal,
+    return Basket(store=store, people=people, lines=list(lines), items_subtotal=subtotal,
                   threshold_discount=discount, delivery_fee=delivery, service_fee=service,
                   small_order_fee=small, promos_used=promos + threshold_labels)
 
 
-def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg: dict) -> Basket | None:
-    """Panier le moins cher de `people` plats principaux (répétitions autorisées)."""
-    mains = [it for it in store.items if classifier.is_main(it)]
-    if not mains:
+def _unit_lower_bound(it: Item) -> float:
+    """Prix unitaire minimal atteignable (un 1+1 divise le prix par deux)."""
+    if it.bogo_get and it.bogo_buy:
+        return it.price * it.bogo_buy / (it.bogo_buy + it.bogo_get)
+    return it.price
+
+
+def _min_subtotal_lines(items: list[Item], n: int, floor_cents: int, min_distinct: int):
+    """Combinaison de `n` unités au sous-total minimal, sous-total >= floor_cents.
+
+    Recherche en profondeur avec élagage (branch & bound) : les articles sont triés
+    par prix unitaire minimal croissant, ce qui donne une borne inférieure valable
+    pour les unités restantes. Calcul en centimes pour éviter les erreurs d'arrondi.
+    """
+    m = len(items)
+    lb = [round(_unit_lower_bound(it) * 100) for it in items]
+    suffix_max = [0] * (m + 1)
+    for i in range(m - 1, -1, -1):
+        suffix_max[i] = max(round(items[i].price * 100), suffix_max[i + 1])
+    cost = [[round(item_cost(it, q)[0] * 100) for q in range(n + 1)] for it in items]
+    best = [float("inf"), None]
+    chosen: list[tuple[int, int]] = []
+
+    def dfs(i: int, rem: int, partial: int, distinct: int):
+        if rem == 0:
+            if partial >= floor_cents and distinct >= min_distinct and partial < best[0]:
+                best[0], best[1] = partial, list(chosen)
+            return
+        if i == m or distinct + min(rem, m - i) < min_distinct:
+            return
+        if partial + rem * suffix_max[i] < floor_cents:
+            return
+        if max(partial + rem * lb[i], floor_cents) >= best[0]:
+            return
+        for q in range(rem, -1, -1):
+            if q:
+                chosen.append((i, q))
+            dfs(i + 1, rem - q, partial + cost[i][q], distinct + (q > 0))
+            if q:
+                chosen.pop()
+
+    dfs(0, n, 0, 0)
+    return None if best[1] is None else [(items[i], q) for i, q in best[1]]
+
+
+def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg: dict,
+                min_distinct: int = 1) -> Basket | None:
+    """Panier le moins cher (frais et promos compris) de `people` plats principaux.
+
+    Le coût total ne dépend que du sous-total des articles et croît avec lui, sauf
+    aux seuils (promo "dès Y €", livraison offerte dès X €, fin des frais de petite
+    commande). Pour chaque seuil, on cherche le plus petit sous-total qui l'atteint ;
+    le meilleur de ces candidats est l'optimum exact.
+    """
+    mains = sorted((it for it in store.items if classifier.is_main(it)), key=_unit_lower_bound)
+    min_distinct = min(min_distinct, people)
+    if len(mains) < min_distinct or not mains:
         return None
+    candidates = mains[:MAX_CANDIDATES] + [it for it in mains[MAX_CANDIDATES:] if it.bogo_get]
 
-    def unit_price(it: Item) -> float:
-        cost, _ = item_cost(it, it.bogo_buy + it.bogo_get) if it.bogo_get else (it.price, 0)
-        return cost / (it.bogo_buy + it.bogo_get) if it.bogo_get else cost
-
-    candidates = sorted(mains, key=unit_price)[:MAX_CANDIDATES]
-    candidates += [it for it in mains if it.bogo_get and it not in candidates]
-
+    floors = {0, fees_cfg["small_order_threshold"], *(p.min_subtotal for p in store.threshold_promos)}
+    if store.free_delivery_min is not None:
+        floors.add(store.free_delivery_min)
     best = None
-    for combo in combinations_with_replacement(candidates, people):
-        b = build_basket(store, people, combo, fees_cfg)
+    for floor in sorted(floors):
+        lines = _min_subtotal_lines(candidates, people, round(floor * 100), min_distinct)
+        if lines is None:
+            continue
+        b = build_basket(store, people, lines, fees_cfg)
         if best is None or b.total < best.total:
             best = b
     return best
@@ -125,19 +172,37 @@ def score_basket(b: Basket, cfg: dict) -> float:
     return round(s["w_price"] * price + s["w_rating"] * rating + s["w_eta"] * eta, 4)
 
 
-def select_deals(stores: list[Store], cfg: dict) -> dict[int, list[Basket]]:
+def brand_key(title: str) -> str:
+    """"Burger King - Aix Jas de Bouffan" et "Burger King" -> "burger king"."""
+    t = unicodedata.normalize("NFKD", title.split(" - ")[0]).encode("ascii", "ignore").decode()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", t.lower()).split())
+
+
+def _composition_key(b: Basket) -> tuple:
+    return tuple(sorted((it.title.lower(), q) for it, q in b.lines)) + (b.items_subtotal,)
+
+
+def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None = None) -> dict[int, list[Basket]]:
     classifier = MealClassifier(cfg["meal"])
     sel = cfg["selection"]
     result = {}
-    for people in sel["group_sizes"]:
+    for people in group_sizes or sel["group_sizes"]:
         baskets = []
         for store in stores:
             if not store.is_open:
                 continue
-            b = best_basket(store, people, classifier, cfg["fees"])
+            b = best_basket(store, people, classifier, cfg["fees"], sel.get("min_distinct_items", 1))
             if b and b.per_person < sel["max_price_per_person"]:
                 b.score = score_basket(b, cfg)
                 baskets.append(b)
         baskets.sort(key=lambda b: b.score, reverse=True)
-        result[people] = baskets[: sel["top_n"]]
+        # Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
+        kept, seen = [], set()
+        for b in baskets:
+            keys = {("brand", brand_key(b.store.title)), ("compo", _composition_key(b))}
+            if keys & seen:
+                continue
+            seen |= keys
+            kept.append(b)
+        result[people] = kept[: sel["top_n"]]
     return result

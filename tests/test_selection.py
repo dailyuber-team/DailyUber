@@ -1,8 +1,12 @@
+import random
+import time
+from itertools import combinations_with_replacement
+
 import pytest
 
 from dailyuber.models import Item, Store, ThresholdPromo
 from dailyuber.parser import parse_delivery_fee, parse_threshold_promos
-from dailyuber.selection import (MealClassifier, best_basket, best_threshold_discount,
+from dailyuber.selection import (MealClassifier, best_basket, best_threshold_discount, brand_key, build_basket,
                                  compute_fees, item_cost, select_deals)
 
 FEES = {"default_delivery_fee": 2.49, "service_fee_pct": 0.10, "service_fee_min": 0.99,
@@ -144,7 +148,91 @@ def test_select_deals_filters_price_and_closed_stores():
 
 
 def test_select_deals_ranks_cheaper_first_at_equal_rating():
-    a = store([Item("Burger", 6.0, section="Burgers")], uuid="a")
-    b = store([Item("Burger", 7.5, section="Burgers")], uuid="b")
+    a = store([Item("Burger", 6.0, section="Burgers")], uuid="a", title="A")
+    b = store([Item("Burger", 7.5, section="Burgers")], uuid="b", title="B")
     deals = select_deals([b, a], CFG)
     assert [x.store.uuid for x in deals[2]] == ["a", "b"]
+
+
+# --- Phase 1 : 1 à 6 personnes, algorithme exact ---
+
+def _brute_force_total(s: Store, people: int, min_distinct: int = 1) -> float | None:
+    """Référence : toutes les combinaisons possibles (lent, seulement pour les tests)."""
+    clf = MealClassifier(MEAL)
+    mains = [it for it in s.items if clf.is_main(it)]
+    best = None
+    for combo in combinations_with_replacement(mains, people):
+        lines = {}
+        for it in combo:
+            lines[id(it)] = (it, lines.get(id(it), (it, 0))[1] + 1)
+        if len(lines) < min(min_distinct, people):
+            continue
+        total = build_basket(s, people, list(lines.values()), FEES).total
+        best = total if best is None else min(best, total)
+    return best
+
+
+def _random_store(rng: random.Random) -> Store:
+    items = []
+    for i in range(rng.randint(1, 7)):
+        bogo = rng.random() < 0.3
+        items.append(Item(f"Burger {i}", round(rng.uniform(5, 16), 1), section="Burgers",
+                          bogo_buy=1 if bogo else 0, bogo_get=1 if bogo else 0,
+                          bogo_max=rng.choice([0, 1, 2]) if bogo else 0))
+    promos = [ThresholdPromo(rng.choice([15, 20, 25, 30, 40]), pct_off=rng.choice([0.1, 0.2, 0.3]), label="%")
+              for _ in range(rng.randint(0, 1))]
+    promos += [ThresholdPromo(rng.choice([20, 30]), amount_off=rng.choice([3, 5, 8]), label="€")
+               for _ in range(rng.randint(0, 1))]
+    return store(items, threshold_promos=promos,
+                 free_delivery_min=rng.choice([None, 15.0, 25.0]),
+                 delivery_fee=rng.choice([None, 0.99]))
+
+
+@pytest.mark.parametrize("people", [1, 2, 3, 4, 5, 6])
+def test_best_basket_matches_brute_force(people):
+    rng = random.Random(people)
+    for _ in range(50):
+        s = _random_store(rng)
+        min_distinct = rng.choice([1, 1, 2, 3])
+        b = best_basket(s, people, MealClassifier(MEAL), FEES, min_distinct)
+        expected = _brute_force_total(s, people, min_distinct)
+        assert (b.total if b else None) == expected
+
+
+def test_one_person_pays_small_order_fee_when_under_threshold():
+    b = best_basket(store([Item("Burger", 7.0, section="Burgers")]), 1, MealClassifier(MEAL), FEES)
+    assert b.small_order_fee == 2.0 and b.per_person == round(7.0 + 2.49 + 0.99 + 2.0, 2)
+
+
+def test_min_distinct_items_forces_variety():
+    items = [Item("Burger A", 6.0, section="Burgers"), Item("Burger B", 7.0, section="Burgers")]
+    b = best_basket(store(items), 4, MealClassifier(MEAL), FEES, min_distinct=2)
+    assert sorted((i.title, q) for i, q in b.lines) == [("Burger A", 3), ("Burger B", 1)]
+    assert best_basket(store(items), 4, MealClassifier(MEAL), FEES, min_distinct=3) is None
+
+
+def test_six_people_is_fast_on_large_menu():
+    rng = random.Random(0)
+    items = [Item(f"Plat {i}", round(rng.uniform(6, 20), 2), section="Plats",
+                  bogo_buy=int(i % 7 == 0), bogo_get=int(i % 7 == 0)) for i in range(80)]
+    s = store(items, threshold_promos=[ThresholdPromo(30, pct_off=0.2, label="-20%")], free_delivery_min=25.0)
+    t0 = time.perf_counter()
+    for _ in range(40):  # ~ 40 restaurants analysés par run
+        best_basket(s, 6, MealClassifier(MEAL), FEES, min_distinct=3)
+    assert time.perf_counter() - t0 < 2.0
+
+
+# --- Phase 0 : doublons d'enseignes ---
+
+def test_brand_key_normalizes_names():
+    assert brand_key("Burger King - Aix Jas de Bouffan") == brand_key("BURGER KING") == "burger king"
+    assert brand_key("🍣Enjoy Sushi Aix-en-Provence🍱") == "enjoy sushi aix en provence"
+
+
+def test_select_deals_keeps_one_basket_per_brand_and_composition():
+    bk1 = store([Item("Whopper", 6.0, section="Burgers")], uuid="1", title="Burger King - Centre")
+    bk2 = store([Item("Whopper", 6.5, section="Burgers")], uuid="2", title="Burger King - Jas")
+    m1 = store([Item("Empanada box", 7.0, section="Menus")], uuid="3", title="Chez Matias")
+    m2 = store([Item("Empanada box", 7.0, section="Menus")], uuid="4", title="Chez Matias Empanadas")
+    deals = select_deals([bk1, bk2, m1, m2], CFG, [2])
+    assert sorted(b.store.uuid for b in deals[2]) == ["1", "3"]
