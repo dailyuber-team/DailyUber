@@ -34,7 +34,10 @@ class Store:
     free_delivery_min: float | None = None  # "livraison à 0 € dès X €"
     signposts: list[str] = field(default_factory=list)
     threshold_promos: list[ThresholdPromo] = field(default_factory=list)
-    is_open: bool = True
+    is_open: bool = True                 # accepte les commandes au moment de la récupération
+    open_until: str = ""                 # "Ouvert jusqu'à 22:00"
+    hours: dict[int, list[tuple[int, int]]] | None = None             # voir hours.parse_hours
+    delivery_slots: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
     items: list[Item] = field(default_factory=list)
 
 
@@ -51,6 +54,7 @@ class Basket:
     promos_used: list[str]
     score: float = 0.0
     is_new: bool = False
+    availability: str = ""               # "Ouvert jusqu'à 22:00" ou "Créneau 12:30–13:00"
 
     @property
     def total(self) -> float:

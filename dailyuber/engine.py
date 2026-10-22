@@ -84,5 +84,6 @@ def build_stores(raw: dict) -> list[Store]:
     return [parse_store_details(feed[uuid], data) for uuid, data in raw["stores"].items() if uuid in feed]
 
 
-def select(stores: list[Store], cfg: dict, people: list[int] | None = None) -> dict[int, list[Basket]]:
-    return select_deals(stores, cfg, people or cfg["selection"]["group_sizes"])
+def select(stores: list[Store], cfg: dict, people: list[int] | None = None,
+           when: datetime | None = None) -> dict[int, list[Basket]]:
+    return select_deals(stores, cfg, people or cfg["selection"]["group_sizes"], when)

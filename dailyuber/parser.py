@@ -2,6 +2,7 @@
 import re
 
 from .fetcher import BASE_URL
+from .hours import parse_delivery_slots, parse_hours
 from .models import Item, Store, ThresholdPromo
 
 _NUM = r"(\d+(?:[.,]\d+)?)"
@@ -82,6 +83,9 @@ def _bogo(item: dict) -> tuple[int, int, int]:
 def parse_store_details(store: Store, raw: dict) -> Store:
     """Complète un Store issu du flux avec le menu et l'état d'ouverture (getStoreV1)."""
     store.is_open = bool(raw.get("isOpen")) and bool(raw.get("isOrderable", True))
+    store.open_until = raw.get("workingHoursTagline") or ""
+    store.hours = parse_hours(raw.get("hours"))
+    store.delivery_slots = parse_delivery_slots(raw.get("adaptedDeliveryHoursInfos"))
     if store.rating is None:
         stats = (raw.get("storeInfoMetadata") or {}).get("rawRatingStats") or {}
         if stats.get("storeRatingScore"):

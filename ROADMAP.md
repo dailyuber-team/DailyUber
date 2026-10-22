@@ -40,11 +40,15 @@
 
 **Validé quand** : les tests couvrent 1, 3 et 6 personnes, et la sélection pour 6 personnes sur 40 restaurants prend moins d'1 s.
 
-## Phase 2 — Horaires et ouverture fiables
-- Parser `hours` (minutes depuis minuit, par plage de jours), `isOpen`/`isOrderable`, `closedMessage`, `scheduledOrderInfo.isSchedulable` et `adaptedDeliveryHoursInfos` (créneaux de livraison par date).
-- Deux modes de recherche : **« maintenant »** (seulement les restaurants qui acceptent les commandes) ou **« pour HH:MM »** (le restaurant doit avoir un créneau planifiable couvrant cette heure).
-- Afficher dans les résultats « ouvert jusqu'à… » ou « créneau 12:00–12:30 ».
-- **À vérifier en réel** : relancer le soir, avec des restaurants fermés, et un jour où un restaurant ferme (dimanche). `storeAvailablityState` dans le flux n'est **pas fiable** (voir CONTEXT.md).
+## Phase 2 — Horaires et ouverture fiables 🟡 (code fait le 22/10/2026, vérification du soir à faire)
+- ✅ Parsing de `hours` (plages de jours en texte, passage de minuit), `isOpen`/`isOrderable`, `workingHoursTagline` et `adaptedDeliveryHoursInfos` (créneaux par date) : `dailyuber/hours.py`.
+- ✅ Deux modes : **« maintenant »** (accepte les commandes ET encore ouvert d'après les horaires) ou **`--at HH:MM [--on demain|AAAA-MM-JJ]`**. Le mode futur exige un créneau planifiable contenant l'heure ; au-delà de l'horizon des créneaux (environ 7 jours), on se fie aux horaires.
+- ✅ Affiché dans les résultats : « Ouvert jusqu'à 22:00 » ou « Créneau 12:30–13:00 ».
+- ✅ Run du 22/10 à 12h47, sur 40 restaurants :
+  - restaurants disponibles : 40 maintenant, 30 à 20h, 13 à 22h30, 38 vendredi midi, 29 samedi midi, 18 dimanche midi ;
+  - écarts entre créneaux et horaires tous expliqués (temps de préparation, dernier créneau qui dépasse la fermeture, fin des livraisons avant la fermeture). Les créneaux font foi.
+- ⏳ **Reste à vérifier en réel le soir (vers 22h)** avec `--refresh` : le flux liste-t-il les restaurants fermés ? `isOpen` est-il faux pour eux ? Le pré-filtre gaspille-t-il des requêtes ? Comparer visuellement 2 ou 3 restaurants avec le site (pas fait le 22/10, le navigateur intégré a refusé ubereats.com).
+- ⏳ À traiter plus tard : pour une heure future, le menu vient du moment de la récupération (une formule midi peut être proposée pour le soir).
 
 **Validé quand** : un run à 22h et un run planifié pour le lendemain midi donnent des listes cohérentes avec le site.
 

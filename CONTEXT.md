@@ -50,60 +50,70 @@ Un outil perso qui parcourt les offres Uber Eats livrables autour d'Aix-en-Prove
 | Créneaux planifiables | store : `scheduledOrderInfo.isSchedulable`, `adaptedDeliveryHoursInfos.{dates[], timeRanges{date: [{startTime,endTime}]}}` |
 
 - ⚠️ Dans le flux, `storeAvailablityState` valait `NOT_ACCEPTING_ORDERS` pour **tous** les restaurants, y compris les ouverts : ce champ **n'est pas fiable**. Il faut utiliser `isOpen`/`isOrderable` de `getStoreV1`.
-- Les autres champs liés aux horaires (`hours`, `adaptedDeliveryHoursInfos`) n'ont été observés qu'une fois, en journée. Il faut encore vérifier leur comportement **le soir et quand le restaurant est fermé**.
+- **Horaires vs créneaux** (observé le 22/10 à 12h47, 40 restaurants) :
+  - `hours` couvre toujours 7 jours. Plages de jours vues : « Tous les jours », « Lundi - Samedi », « Dimanche - Jeudi » (passe par le week-end), jours seuls. Aucune plage passant minuit dans l'échantillon, mais le code le gère.
+  - `adaptedDeliveryHoursInfos` donne des créneaux de 30 min tous les 15 min, sur un horizon d'environ 7 jours. Les jours fermés sont absents.
+  - **Les créneaux sont plus précis que les horaires**, et c'est sur eux qu'on se fonde :
+    - le dernier créneau peut dépasser la fermeture (22h15–22h45 pour une fermeture à 22h30) ;
+    - le premier commence après l'ouverture (temps de préparation) ;
+    - un commerce peut arrêter ses livraisons avant de fermer (Carrefour : ouvert jusqu'à 20h30, livraisons jusqu'à 20h).
+- ⚠️ **Pas encore vérifié** : le comportement **le soir et la nuit**. Le flux liste-t-il les restaurants fermés ? Le pré-filtre gaspille-t-il des requêtes sur des restaurants fermés ? `isOpen` et les créneaux du jour sont-ils corrects ? Le navigateur intégré a refusé d'ouvrir ubereats.com le 22/10 : la comparaison visuelle avec le site n'a donc pas été faite.
 
-## 4. État actuel du code (roadmap : phases 0 et 1 faites, en attente de validation)
+## 4. État actuel du code (roadmap : phases 0, 1 et 2 faites ; phase 2 à revérifier le soir)
 
-Dépôt GitHub privé : https://github.com/dailyuber-team/DailyUber (branche `main`), dans l'organisation `dailyuber-team` (propriétaire : Anatole-1 ; collaboratrice emmagmzc, admin du dépôt). Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
-
-**Phases 0 et 1 :**
-- `dailyuber/engine.py` (`get_raw` avec cache de 30 min, `build_stores`, `select`) est le point d'entrée réutilisable par la future API.
-- CLI : `--refresh`, `--offline`, `--people 1..6`.
-- Nouvel algorithme exact (`_min_subtotal_lines` + seuils dans `best_basket`).
-- Option `selection.min_distinct_items`.
-- Fusion des doublons par enseigne normalisée (`brand_key`) ou par composition identique.
-- 37 tests.
+Dépôt GitHub privé : https://github.com/dailyuber-team/DailyUber (branche `main`), dans l'organisation `dailyuber-team` (propriétaire : Anatole-1 ; collaboratrice emmagmzc, admin du dépôt). L'ancienne adresse `Anatole-1/DailyUber` n'est qu'une redirection : **ne jamais la « supprimer »**, ça viserait le vrai dépôt. Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
 
 ```
 DailyUber/
-  config.yaml            # adresse, délais, pré-filtre, frais estimés, définition d'un repas, scoring
+  config.yaml            # adresse, délais, cache, pré-filtre, frais estimés, définition d'un repas, sélection, scoring
   .env.example           # DISCORD_WEBHOOK_URL (pas encore utilisé)
-  requirements.txt       # playwright==1.64.0, PyYAML, python-dotenv, pytest
+  requirements.txt       # playwright==1.64.0, PyYAML, python-dotenv, pytest, tzdata (fuseau Paris sous Windows)
   dailyuber/
     config.py            # charge config.yaml et .env
-    models.py            # Item, ThresholdPromo, Store, Basket (total, prix par personne, clé)
+    models.py            # Item, ThresholdPromo, Store (dont is_open, open_until, hours, delivery_slots), Basket (dont availability)
     fetcher.py           # UberEatsSession (Playwright) : fetch_feed(), fetch_store(), délais aléatoires
-    parser.py            # flux et store → modèles ; parse les promos à seuil et les frais de livraison
-    selection.py         # MealClassifier, item_cost (1+1), compute_fees, best_basket, score, select_deals
-    history.py           # data/history.json : marque les restaurants nouveaux dans le top par rapport au run précédent
+    parser.py            # flux et store → modèles ; promos à seuil, frais de livraison, horaires et créneaux
+    hours.py             # parse_day_range, parse_hours, is_open_at, parse_delivery_slots, availability, resolve_target
+    selection.py         # MealClassifier, item_cost (1+1), compute_fees, best_basket (exact), brand_key, select_deals(when=)
+    engine.py            # get_raw (cache 30 min), fetch_raw, load_cached_raw, build_stores, select : API du moteur
+    history.py           # data/history.json : restaurants nouveaux dans le top par rapport au run précédent
     report.py            # rendu console
-    main.py              # python -m dailyuber.main [--offline]
-  tests/test_selection.py  # 26 tests (frais, 1+1, promos à seuil, classification, composition, filtres)
-  data/raw/latest.json.gz  # dernière récupération brute (permet --offline)
+    main.py              # CLI
+  tests/test_selection.py  # frais, 1+1, promos, classification, algorithme vs recherche exhaustive, doublons
+  tests/test_hours.py      # plages de jours, passage de minuit, disponibilité maintenant / créneau / horaires
+  data/raw/latest.json.gz  # dernière récupération brute (cache, permet --offline)
 ```
 
-**Lancer :**
-- `.venv\Scripts\python -m dailyuber.main` : récupération réelle, environ 3 min pour 40 menus.
-- `... --offline` : relance la sélection sur la dernière récupération, sans requête.
-- Tests : `.venv\Scripts\python -m pytest -q`.
+**Lancer** (52 tests : `.venv\Scripts\python -m pytest -q`) :
+- `.venv\Scripts\python -m dailyuber.main` : utilise le cache s'il a moins de 30 min, sinon récupère (environ 3 min pour 40 menus).
+- `--refresh` : force une nouvelle récupération ; `--offline` : utilise le cache quel que soit son âge.
+- `--people 1 3 6` : nombre(s) de personnes.
+- `--at 20:00` : heure de livraison visée, aujourd'hui (ou demain si elle est passée) ; `--on demain` ou `--on 2026-10-24` pour choisir le jour.
 
 **Logique actuelle :**
-1. Flux (3 pages).
+1. Flux (3 pages, environ 257 restaurants).
 2. Pré-filtre : note ≥ 4.0, délai ≤ 45 min, restaurants avec promo en premier, 40 maximum.
 3. `getStoreV1` pour chacun.
-4. Repas = article ≥ 6 € dont le titre ou la section contient un mot-clé « plat », sans mot-clé d'exclusion. La section peut exclure un article (« Accompagnements »), mais « Menu burger frites » reste un plat.
-5. Panier = combinaison la moins chère de N plats parmi les 20 moins chers + tous les articles en 1+1 (`combinations_with_replacement`, répétitions autorisées).
-6. Total = articles (après 1+1) − meilleure promo à seuil + livraison (défaut 2,49 €, ou valeur affichée, ou offerte sous condition) + service estimé (10 %, entre 0,99 € et 4,99 €) + petite commande (2 € si < 8 €).
-7. On garde les paniers à moins de 10 €/pers, classés par score : 0,6 × prix + 0,25 × note + 0,15 × délai.
-8. Top 5 pour 2 et pour 4 personnes.
+4. **Disponibilité** (`hours.availability`) :
+   - « maintenant » (ou heure visée dans moins de 30 min) : il faut `isOpen` et `isOrderable` à la récupération, ET que le restaurant soit encore ouvert d'après ses horaires à l'heure actuelle. Libellé : « Ouvert jusqu'à 22:00 ».
+   - heure future : si la date est dans l'horizon des créneaux, il faut un créneau qui contient l'heure visée (on garde celui qui commence le plus tard) ; libellé « Créneau 12:30–13:00 ». Au-delà de l'horizon, on se fie aux horaires : « Ouvert à cette heure (non planifiable…) ».
+5. Repas = article ≥ 6 € dont le titre ou la section contient un mot-clé « plat », sans mot-clé d'exclusion. La section peut exclure un article (« Accompagnements »), mais « Menu burger frites » reste un plat.
+6. **Panier optimal exact** pour N plats (1 à 6) :
+   - Le coût total ne dépend que du sous-total et croît avec lui, sauf aux seuils (promo « dès Y € », livraison offerte dès X €, petite commande < 8 €).
+   - Pour chaque seuil, `_min_subtotal_lines` cherche le plus petit sous-total qui l'atteint, par recherche avec élagage (en centimes). On garde ensuite le meilleur total.
+   - Candidats : les 40 plats les moins chers + tous les 1+1. Option `min_distinct_items`.
+   - Environ 15 ms pour 40 restaurants, même à 6 personnes.
+7. Total = articles (après 1+1) − meilleure promo à seuil + livraison (défaut 2,49 €, valeur affichée, ou offerte sous condition) + service estimé (10 %, entre 0,99 € et 4,99 €) + petite commande (2 € si < 8 €).
+8. On garde les paniers à moins de 10 €/pers, classés par score : 0,6 × prix + 0,25 × note + 0,15 × délai. Une seule offre par enseigne (`brand_key`) et par composition identique. Top 5 par taille de groupe.
+9. L'historique « nouveau » n'est mis à jour que pour les recherches « maintenant ».
 
 **Limites connues :**
 - Frais de service estimés, pas réels.
-- L'algorithme de composition **explose au-delà de 4 personnes** : C(25,6) ≈ 177 000 combinaisons par restaurant. Il faut le remplacer (voir la roadmap).
+- **Pour une heure future, le menu et les prix sont ceux du moment de la récupération** : une « formule midi » récupérée à midi sera proposée pour un dîner. Ce n'est pas encore géré.
+- Le pré-filtre ne sait pas exclure les restaurants fermés (le flux n'est pas fiable sur ce point). Le soir, des requêtes peuvent être gaspillées sur des restaurants fermés. À vérifier.
 - Les promos « article offert » sont signalées mais pas chiffrées.
 - Les options obligatoires des articles personnalisables sont ignorées.
 - La classification des repas par mots-clés est imparfaite (« Maki anguille grillée 6 € » passe pour un plat).
-- Deux enseignes identiques peuvent apparaître toutes les deux (deux « Chez Matias »).
 
 ## 5. Décisions déjà prises
 
@@ -113,11 +123,11 @@ DailyUber/
 - Secrets dans `.env` / GitHub Secrets.
 - Discord (webhook + embeds + alerte en cas d'erreur) et la planification quotidienne à 11h00, heure de Paris, étaient prévus. Ils sont **reportés** après l'interface graphique (voir la roadmap).
 
-## 6. Nouvelles demandes (à traiter, voir ROADMAP.md)
+## 6. Nouvelles demandes (voir ROADMAP.md pour l'avancement)
 
 1. Interface graphique simple et épurée.
-2. Nombre de personnes réglable de 1 à 6.
+2. Nombre de personnes réglable de 1 à 6. ✅ (moteur et CLI ; reste l'interface)
 3. Enseignes favorites : toujours analysées et affichées en priorité.
 4. Application portable : PC d'abord, téléphone ensuite.
 5. Choix d'une zone géographique dans laquelle les offres sont cherchées.
-6. Vérification fiable des horaires de commande et de l'ouverture des restaurants.
+6. Vérification fiable des horaires de commande et de l'ouverture des restaurants. ✅ (à revérifier le soir)

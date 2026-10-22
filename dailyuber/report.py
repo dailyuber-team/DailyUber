@@ -14,7 +14,7 @@ def format_basket(rank: int, b: Basket) -> str:
         eta = f"{s.eta_min} min" if s.eta_min == s.eta_max else f"{s.eta_min}-{s.eta_max} min"
     rating = f"{s.rating:.1f}★ ({s.rating_count})" if s.rating else "sans note"
     lines = [f"{rank}. {'🆕 ' if b.is_new else ''}{s.title}  —  {eur(b.per_person)}/pers  (total {eur(b.total)})"]
-    lines.append(f"   {rating} · {eta}")
+    lines.append(f"   {rating} · {eta}" + (f" · {b.availability}" if b.availability else ""))
     for it, qty in b.lines:
         custom = " *" if it.has_customizations else ""
         lines.append(f"   - {qty} × {it.title} ({eur(it.price)}){custom}")
@@ -35,7 +35,8 @@ def format_report(deals: dict[int, list[Basket]], stats: dict) -> str:
     out = [f"=== DailyUber — {stats['address']} ===",
            f"Données du {stats['fetched_at'].replace('T', ' à ')} — "
            f"{stats['feed_stores']} restaurants dans le flux, {stats['fetched']} menus analysés, "
-           f"{stats['open']} ouverts"]
+           f"{stats['open']} ouverts à la récupération",
+           f"Livraison : {stats['when']}"]
     for people, baskets in deals.items():
         out.append(f"\n--- Top {len(baskets)} pour {people} personnes ---")
         if not baskets:

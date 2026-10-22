@@ -1,7 +1,9 @@
 """Composition des paniers, calcul des frais et des promos, filtrage et classement."""
 import re
 import unicodedata
+from datetime import datetime
 
+from .hours import PARIS, availability
 from .models import Basket, Item, Store
 
 MAX_CANDIDATES = 40  # plats les moins chers considérés par restaurant (plus tous les 1+1)
@@ -182,18 +184,23 @@ def _composition_key(b: Basket) -> tuple:
     return tuple(sorted((it.title.lower(), q) for it, q in b.lines)) + (b.items_subtotal,)
 
 
-def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None = None) -> dict[int, list[Basket]]:
+def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None = None,
+                 when: datetime | None = None, now: datetime | None = None) -> dict[int, list[Basket]]:
+    """Top N par taille de groupe. `when` : heure de livraison visée (None = maintenant)."""
     classifier = MealClassifier(cfg["meal"])
     sel = cfg["selection"]
+    now = now or datetime.now(PARIS)
+    available = {s.uuid: label for s in stores if (label := availability(s, when, now)) is not None}
     result = {}
     for people in group_sizes or sel["group_sizes"]:
         baskets = []
         for store in stores:
-            if not store.is_open:
+            if store.uuid not in available:
                 continue
             b = best_basket(store, people, classifier, cfg["fees"], sel.get("min_distinct_items", 1))
             if b and b.per_person < sel["max_price_per_person"]:
                 b.score = score_basket(b, cfg)
+                b.availability = available[store.uuid]
                 baskets.append(b)
         baskets.sort(key=lambda b: b.score, reverse=True)
         # Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
