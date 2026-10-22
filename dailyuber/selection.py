@@ -45,6 +45,11 @@ def item_cost(item: Item, qty: int) -> tuple[float, int]:
     return round(item.price * (qty - free), 2), free
 
 
+def uber_one_applies(items_subtotal: float, fees_cfg: dict) -> bool:
+    one = fees_cfg.get("uber_one") or {}
+    return bool(one.get("enabled")) and items_subtotal >= one["min_subtotal"]
+
+
 def compute_fees(items_subtotal: float, store: Store, fees_cfg: dict) -> tuple[float, float, float]:
     """(frais de livraison, frais de service, frais de petite commande)."""
     delivery = store.delivery_fee if store.delivery_fee is not None else fees_cfg["default_delivery_fee"]
@@ -52,6 +57,9 @@ def compute_fees(items_subtotal: float, store: Store, fees_cfg: dict) -> tuple[f
         delivery = 0.0
     service = min(max(items_subtotal * fees_cfg["service_fee_pct"], fees_cfg["service_fee_min"]),
                   fees_cfg["service_fee_max"])
+    if uber_one_applies(items_subtotal, fees_cfg):
+        delivery = 0.0
+        service *= 1 - fees_cfg["uber_one"]["service_fee_discount"]
     small = fees_cfg["small_order_fee"] if items_subtotal < fees_cfg["small_order_threshold"] else 0.0
     return round(delivery, 2), round(service, 2), round(small, 2)
 
@@ -83,7 +91,9 @@ def build_basket(store: Store, people: int, lines: list[tuple[Item, int]], fees_
     subtotal = round(subtotal, 2)
     discount, threshold_labels = best_threshold_discount(subtotal, store)
     delivery, service, small = compute_fees(subtotal, store, fees_cfg)
-    if delivery == 0:
+    if uber_one_applies(subtotal, fees_cfg):
+        promos.append("Uber One : livraison offerte, frais de service réduits")
+    elif delivery == 0:
         promos.append("Livraison offerte")
     return Basket(store=store, people=people, lines=list(lines), items_subtotal=subtotal,
                   threshold_discount=discount, delivery_fee=delivery, service_fee=service,
@@ -141,7 +151,7 @@ def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg:
 
     Le coût total ne dépend que du sous-total des articles et croît avec lui, sauf
     aux seuils (promo "dès Y €", livraison offerte dès X €, fin des frais de petite
-    commande). Pour chaque seuil, on cherche le plus petit sous-total qui l'atteint ;
+    commande, minimum Uber One). Pour chaque seuil, on cherche le plus petit sous-total qui l'atteint ;
     le meilleur de ces candidats est l'optimum exact.
     """
     mains = sorted((it for it in store.items if classifier.is_main(it)), key=_unit_lower_bound)
@@ -153,6 +163,8 @@ def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg:
     floors = {0, fees_cfg["small_order_threshold"], *(p.min_subtotal for p in store.threshold_promos)}
     if store.free_delivery_min is not None:
         floors.add(store.free_delivery_min)
+    if (fees_cfg.get("uber_one") or {}).get("enabled"):
+        floors.add(fees_cfg["uber_one"]["min_subtotal"])
     best = None
     for floor in sorted(floors):
         lines = _min_subtotal_lines(candidates, people, round(floor * 100), min_distinct)

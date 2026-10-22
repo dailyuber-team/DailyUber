@@ -236,3 +236,31 @@ def test_select_deals_keeps_one_basket_per_brand_and_composition():
     m2 = store([Item("Empanada box", 7.0, section="Menus")], uuid="4", title="Chez Matias Empanadas")
     deals = select_deals([bk1, bk2, m1, m2], CFG, [2])
     assert sorted(b.store.uuid for b in deals[2]) == ["1", "3"]
+
+
+# --- Uber One ---
+
+FEES_ONE = {**FEES, "uber_one": {"enabled": True, "min_subtotal": 12.0, "service_fee_discount": 0.5}}
+
+
+def test_uber_one_free_delivery_and_half_service_fee():
+    assert compute_fees(30.0, store([]), FEES_ONE) == (0.0, 1.5, 0.0)
+
+
+def test_uber_one_not_applied_under_minimum():
+    assert compute_fees(10.0, store([]), FEES_ONE) == (2.49, 1.0, 0.0)
+
+
+def test_uber_one_disabled_changes_nothing():
+    off = {**FEES, "uber_one": {**FEES_ONE["uber_one"], "enabled": False}}
+    assert compute_fees(30.0, store([]), off) == compute_fees(30.0, store([]), FEES)
+
+
+def test_uber_one_basket_reaches_minimum_when_cheaper():
+    # 1 personne : 1 burger à 11 € paie livraison + service (14,59 €) ;
+    # le menu à 12 € atteint le minimum Uber One et revient moins cher (12,60 €).
+    s = store([Item("Burger", 11.0), Item("Menu burger", 12.0)])
+    b = best_basket(s, 1, MealClassifier(MEAL), FEES_ONE)
+    assert [it.title for it, _ in b.lines] == ["Menu burger"]
+    assert b.total == 12.6
+    assert any("Uber One" in p for p in b.promos_used)

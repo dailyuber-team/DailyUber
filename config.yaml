@@ -30,6 +30,12 @@ fees:
   service_fee_max: 4.99
   small_order_threshold: 8.00  # "2 EUR pour les commandes inférieures à 8 EUR" (texte Uber)
   small_order_fee: 2.00
+  # Abonnement Uber One (France) : livraison à 0 € et jusqu'à -50 % sur les frais
+  # de service dès 12 € d'articles. Activable aussi avec --uber-one / --no-uber-one.
+  uber_one:
+    enabled: false
+    min_subtotal: 12.00
+    service_fee_discount: 0.50   # "jusqu'à 50 %" : valeur max, à calibrer sur une vraie commande
 
 # Définition d'un "repas" : un article compte comme plat principal si sa section
 # OU son titre contient un mot-clé "main", et ni l'un ni l'autre un mot-clé "exclude".

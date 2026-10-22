@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : python -m dailyuber.main [--refresh | --offline] [--people 1 3 6] [--at 12:30 [--on demain]]"""
+"""Point d'entrée CLI : python -m dailyuber.main [--refresh | --offline] [--people 1 3 6] [--at 12:30 [--on demain]] [--uber-one]"""
 import argparse
 import logging
 import sys
@@ -20,7 +20,7 @@ def when_label(when: datetime | None) -> str:
 
 
 def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
-        when: datetime | None = None) -> str:
+        when: datetime | None = None, uber_one: bool | None = None) -> str:
     if offline:
         raw = engine.load_cached_raw(cfg)
         if raw is None:
@@ -28,12 +28,14 @@ def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
     else:
         raw = engine.get_raw(cfg, refresh=refresh)
     stores = engine.build_stores(raw)
+    cfg = engine.with_uber_one(cfg, uber_one)
     deals = engine.select(stores, cfg, people, when)
     if when is None:  # l'historique "nouveau depuis la veille" ne suit que les recherches immédiates
         mark_new_and_save(deals, cfg["storage"]["data_dir"])
     stats = {"address": cfg["address"]["label"], "fetched_at": raw.get("fetched_at", "?"),
              "feed_stores": len(raw["feed"]), "fetched": len(stores),
-             "open": sum(s.is_open for s in stores), "when": when_label(when)}
+             "open": sum(s.is_open for s in stores), "when": when_label(when),
+             "uber_one": cfg["fees"]["uber_one"]["enabled"]}
     return format_report(deals, stats)
 
 
@@ -46,6 +48,8 @@ def main() -> int:
                     help="nombre(s) de personnes, de 1 à 6 (défaut : config.yaml)")
     ap.add_argument("--at", metavar="HH:MM", help="heure de livraison visée (défaut : maintenant)")
     ap.add_argument("--on", metavar="DATE", help="jour visé avec --at : AAAA-MM-JJ ou 'demain' (défaut : prochaine occurrence)")
+    ap.add_argument("--uber-one", action=argparse.BooleanOptionalAction, default=None,
+                    help="calcule les prix avec (ou sans, --no-uber-one) l'abonnement Uber One (défaut : config.yaml)")
     ap.add_argument("--config", help="chemin vers config.yaml")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -53,7 +57,7 @@ def main() -> int:
     cfg = load_config(args.config)
     try:
         when = resolve_target(args.at, args.on, datetime.now(PARIS))
-        print(run(cfg, args.offline, args.refresh, args.people, when))
+        print(run(cfg, args.offline, args.refresh, args.people, when, args.uber_one))
     except Exception:
         log.exception("Échec du run")
         return 1

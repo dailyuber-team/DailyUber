@@ -4,6 +4,7 @@ La récupération (plusieurs minutes) ne dépend ni du nombre de personnes ni de
 réglages de sélection : on la fait une fois, on la met en cache, et toute
 nouvelle sélection repart du cache sans requête vers Uber Eats.
 """
+import copy
 import gzip
 import json
 import logging
@@ -84,6 +85,16 @@ def build_stores(raw: dict) -> list[Store]:
     return [parse_store_details(feed[uuid], data) for uuid, data in raw["stores"].items() if uuid in feed]
 
 
+def with_uber_one(cfg: dict, enabled: bool | None) -> dict:
+    """Copie de la config avec Uber One forcé (True/False), ou inchangée si None."""
+    if enabled is None:
+        return cfg
+    cfg = copy.deepcopy(cfg)
+    cfg["fees"]["uber_one"]["enabled"] = enabled
+    return cfg
+
+
 def select(stores: list[Store], cfg: dict, people: list[int] | None = None,
-           when: datetime | None = None) -> dict[int, list[Basket]]:
+           when: datetime | None = None, uber_one: bool | None = None) -> dict[int, list[Basket]]:
+    cfg = with_uber_one(cfg, uber_one)
     return select_deals(stores, cfg, people or cfg["selection"]["group_sizes"], when)

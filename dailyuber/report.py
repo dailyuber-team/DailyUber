@@ -36,7 +36,8 @@ def format_report(deals: dict[int, list[Basket]], stats: dict) -> str:
            f"Données du {stats['fetched_at'].replace('T', ' à ')} — "
            f"{stats['feed_stores']} restaurants dans le flux, {stats['fetched']} menus analysés, "
            f"{stats['open']} ouverts à la récupération",
-           f"Livraison : {stats['when']}"]
+           f"Livraison : {stats['when']}",
+           "Prix avec Uber One" if stats.get("uber_one") else "Prix sans Uber One"]
     for people, baskets in deals.items():
         out.append(f"\n--- Top {len(baskets)} pour {people} personnes ---")
         if not baskets:

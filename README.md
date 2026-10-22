@@ -47,6 +47,7 @@ La première recherche prend environ 3 minutes. Les données sont ensuite gardé
 | `--people N …` | Nombre(s) de personnes, de 1 à 6 |
 | `--at HH:MM` | Heure de livraison visée : aujourd'hui, ou demain si l'heure est passée (par défaut : maintenant) |
 | `--on JOUR` | Jour visé avec `--at` : `demain` ou une date `AAAA-MM-JJ` |
+| `--uber-one` / `--no-uber-one` | Calcule les prix avec ou sans l'abonnement Uber One |
 | `--refresh` | Force une nouvelle récupération, même si le cache est récent |
 | `--offline` | Réutilise les dernières données, même si elles sont anciennes |
 | `--config chemin` | Utilise un autre fichier de configuration |
@@ -60,7 +61,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `address` | Adresse de livraison (par défaut : Cours Mirabeau) |
 | `selection` | Nombres de personnes par défaut, budget max par personne, taille du top, plats différents imposés ou non |
 | `prefilter` | Note minimale et délai de livraison maximal |
-| `fees` | Estimation des frais de livraison et de service |
+| `fees` | Estimation des frais de livraison et de service, et Uber One (`uber_one.enabled: true` si tu es abonné) |
 | `meal` | Ce qui compte comme un « plat » (prix minimum, mots-clés) |
 | `scoring` | Poids du prix, de la note et du délai dans le classement |
 | `fetch` | Nombre de restaurants analysés, délai entre les requêtes, durée du cache |
@@ -75,6 +76,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 
 - **Les frais de service sont estimés** (10 % du panier, entre 0,99 € et 4,99 €) : Uber ne donne le montant exact qu'au paiement. Le prix réel peut donc varier un peu.
 - On ne se connecte jamais à un compte Uber. L'outil lit les données publiques du site, ce que les CGU d'Uber n'autorisent pas : à garder pour un usage perso et modéré.
+- **Uber One** : livraison à 0 € et frais de service réduits de 50 % dès 12 € d'articles. Uber annonce « jusqu'à 50 % », donc l'économie réelle peut être un peu plus faible.
 - Les promos « article offert » sont signalées mais pas comptées dans le prix.
 - Chaque offre indique jusqu'à quand le restaurant est ouvert, ou le créneau de livraison retenu. Pour une commande à l'avance, le menu et les prix sont ceux du moment de la recherche (une formule midi peut apparaître pour le soir).
 
