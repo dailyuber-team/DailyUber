@@ -119,7 +119,7 @@ DailyUber/
 
 **Logique actuelle :**
 1. Flux (3 pages, environ 257 restaurants).
-2. Pré-filtre : note ≥ 4.0, délai ≤ 45 min, restaurants avec promo en premier, 40 maximum.
+2. Pré-filtre : note minimale (`min_rating: 0` depuis le 27/10 : tous les restaurants, la note est affichée sur chaque offre ; 4.0 avant), délai ≤ 45 min, restaurants avec promo en premier, 40 maximum en local (tous sur GitHub).
 3. `getStoreV1` pour chacun.
 4. **Disponibilité** (`hours.availability`) :
    - « maintenant » (ou heure visée dans moins de 30 min) : il faut `isOpen` et `isOrderable` à la récupération, ET que le restaurant soit encore ouvert d'après ses horaires à l'heure actuelle. Libellé : « Ouvert jusqu'à 22:00 ».
@@ -158,3 +158,12 @@ DailyUber/
 4. Application portable : PC d'abord, téléphone ensuite. ✅ côté téléphone (PWA sur GitHub Pages) ; pas d'exécutable PC autonome.
 5. Choix d'une zone géographique dans laquelle les offres sont cherchées.
 6. Vérification fiable des horaires de commande et de l'ouverture des restaurants. ✅ (à revérifier le soir)
+
+## 7. Deliveroo (étudié le 27/10, pas implémenté)
+
+- Deliveroo livre à Aix : la page `https://deliveroo.fr/fr/restaurants/aix-en-provence/aix-centre` liste **72 restaurants** (quartiers Centre, Les Milles, Pont de l'Arc…), contre environ 390 sur Uber Eats.
+- **Les données sont dans le HTML** (Next.js, `<script id="__NEXT_DATA__">`), obtenu par un simple `curl` sans navigateur (protection PerimeterX présente, mais pas bloquante le 27/10 depuis un PC) :
+  - flux : `props.initialState.home.feed.results` → blocs `UIRooBlock` (gabarits `partner-card-*`) avec `partner-name.content`, `partner-rating.content`, `partner-rating-count.content`, délai, distance, badges promo (« 1 plat acheté = 1 plat offert », « Commandez pour 15 €, profitez de -15 % »…) ; lien menu dans l'action `navigate_to_restaurant` (`restaurant_href`, `restaurant_id`) ;
+  - menu : `https://deliveroo.fr/fr/menu/<ville>/<quartier>/<slug>` (environ 2,7 Mo) → `props.initialState.menuPage` ; articles avec `price.fractional` (centimes), `priceDiscounted`, `offerText`/`offerTag`, `available` ; frais de livraison en texte (« 2,49 € de livraison », « Commandez pour 10,00 € et les frais de livraison sont offerts »). Frais de service non vus (à estimer comme pour Uber).
+- **robots.txt** : interdit `/api/`, `*/graphql`, `*/item/`… mais pas les pages de liste ni de menu.
+- **CGU** : interdisent explicitement de « procéder à une forme de récupération de données sur nos Applications en extrayant des données ou du contenu à l'aide de systèmes automatisés ». Même situation que pour Uber Eats.

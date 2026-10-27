@@ -22,7 +22,8 @@ fetch:
 
 prefilter:
   # Appliqué sur le flux, avant de télécharger les menus.
-  min_rating: 4.0            # les restaurants sans note sont gardés
+  min_rating: 0              # 0 = tous les restaurants, quelle que soit leur note (affichée sur
+                             # chaque offre) ; les restaurants sans note sont toujours gardés
   max_eta_min: 45
 
 # Estimation des frais : Uber ne donne le montant exact qu'au checkout (compte requis).

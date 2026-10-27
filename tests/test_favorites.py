@@ -78,6 +78,7 @@ def cfg(tmp_path, monkeypatch):
     c = copy.deepcopy(load_config())
     c["storage"]["data_dir"] = str(tmp_path)
     c["fetch"]["max_stores"] = 2
+    c["prefilter"]["min_rating"] = 4.0  # D (note 3,2) ne passe le pré-filtre que comme favori
     c["favorites"] = [f"https://www.ubereats.com/fr/store/d/{_b64(U[3])}", U[5], U[3], "pas un lien"]
     return c
 

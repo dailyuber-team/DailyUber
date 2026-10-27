@@ -113,7 +113,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 |---|---|
 | `address` | Adresse de livraison (par défaut : Cours Mirabeau) |
 | `selection` | Nombres de personnes par défaut, budget max par personne, taille du top, plats différents imposés ou non |
-| `prefilter` | Note minimale et délai de livraison maximal |
+| `prefilter` | Note minimale (0 par défaut : tous les restaurants, la note est affichée sur chaque offre) et délai de livraison maximal |
 | `fees` | Estimation des frais de livraison et de service, et Uber One (`uber_one.enabled: true` si tu es abonné) |
 | `meal` | Ce qui compte comme un « plat » (prix minimum, mots-clés) |
 | `meal_types` | Les types de repas proposés et leurs mots-clés |

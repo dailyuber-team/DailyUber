@@ -310,6 +310,16 @@ def test_prefilter_max_stores_zero_keeps_all():
     assert len(prefilter(stores, cfg)) == 3
 
 
+def test_prefilter_min_rating_zero_keeps_low_rated_stores():
+    from dailyuber.engine import prefilter
+    stores = [store([], uuid="low", title="Low"), store([], uuid="none", title="None")]
+    stores[0].rating, stores[1].rating = 2.4, None
+    cfg = {"prefilter": {"min_rating": 0, "max_eta_min": 45}, "fetch": {"max_stores": 0}}
+    assert {s.uuid for s in prefilter(stores, cfg)} == {"low", "none"}
+    cfg["prefilter"]["min_rating"] = 4.0
+    assert {s.uuid for s in prefilter(stores, cfg)} == {"none"}
+
+
 def test_always_excluded_keywords_beat_main_keywords():
     meal = {**MEAL, "main_keywords": MEAL["main_keywords"] + ["crousty"], "always_exclude_keywords": ["nutella"]}
     c = MealClassifier(meal)
