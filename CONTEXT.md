@@ -159,7 +159,24 @@ DailyUber/
 5. Choix d'une zone géographique dans laquelle les offres sont cherchées.
 6. Vérification fiable des horaires de commande et de l'ouverture des restaurants. ✅ (à revérifier le soir)
 
-## 7. Deliveroo (étudié le 27/10, pas implémenté)
+## 7. Deliveroo (implémenté le 27/10, à la demande de l'utilisateur malgré les CGU)
+
+**Implémentation** (`dailyuber/deliveroo.py`, sans navigateur, `urllib` + délais aléatoires de `fetch`) :
+- `config.yaml` `deliveroo` : `enabled`, `city`/`neighborhood` (page de liste), `sample_times` (heures interrogées aujourd'hui et demain). Le geohash de l'adresse de recherche est calculé (`deliveroo.geohash`).
+- Récupération (`fetch_raw`, appelée à la fin de `engine.fetch_raw` ; un échec n'empêche pas les offres Uber) : la liste « maintenant », puis la liste à chaque heure échantillon (`?day=today|tomorrow&time=HH:MM`, vérifié : la liste change selon l'heure), puis un menu par restaurant, lu à la première heure où il livre (le matin, McDonald's n'affiche que le petit-déjeuner ; les articles `available: false` sont écartés). Menus réduits (`trim_menu`, environ 100 Ko au lieu de 2,7 Mo) dans `raw["deliveroo"]`.
+- Position : Deliveroo ne donne que l'adresse → géocodage par `api-adresse.data.gouv.fr` (public, sans clé), pour « Autour de moi ».
+- Lecture (`build_stores`) → `Store(platform="deliveroo", uuid="deliveroo:<id>")` :
+  - `is_open` = présent avec délai dans la liste « maintenant » ; « Ferme à 22:30 » → `open_until` ; `hours=None` (Deliveroo n'affiche pas d'horaires) ;
+  - `delivery_slots` : chaque heure échantillon où il apparaît donne un créneau d'une heure centré (approximation ; au-delà de demain, pas de disponibilité) ;
+  - « Montant min. de 10,00 € » → `min_order` (aucun panier en dessous) ; « 1,79 € de livraison » → `delivery_fee` ; `FreeDeliveryOffer` ou badge « Commandez pour X €, Économisez la livraison » → `free_delivery_min` ; badge « Commandez pour 15 €, profitez de -15 % » → promo à seuil ; « Un produit offert dès 30 € » → cadeau signalé ;
+  - offres du menu (`menu_promos`) : `FullMenuPercentOffOffer` (-X % dès Y €, Y parfois 0) → promo à seuil ; ⚠️ Deliveroo affiche **déjà** ce prix remisé sur chaque plat, même quand il faut atteindre Y € (constaté sur 16 restaurants, dont GREY SUSHI : 115 plats à -15 % pour « -15 % dès 20 € ») : ces plats sont remis au prix plein pour ne compter la remise qu'une fois ; avec `maxDiscount`, offre ignorée. `FreeItemOffer` → cadeau signalé. `ItemSpecificPercentOffOffer` et `PercentageOffOnSingleItemMultibuyOffer` : seulement via `priceDiscounted`. Le badge de la liste est souvent un gabarit non rempli (« -{Amount} dès {MOV} d'achat ») ;
+  - `BuyOneGetOneFreeOffer` (`itemIds`) → 1+1 sur ces plats, limité à 1 fois (`BOGO_MAX`, nombre réel inconnu : prudent) ; `priceDiscounted` > 0 → prix remisé (0 = l'article offert d'un 1+1).
+- Frais : `fees.platforms.deliveroo` remplace les frais Uber (`selection.platform_fees`, `engine.js platformFees`) ; Uber One ne s'applique pas ; pas de frais de petite commande (montant minimum à la place) ; frais de service non affichés par Deliveroo : estimation à calibrer.
+- Doublons : par plateforme (le même restaurant sur Uber Eats et Deliveroo apparaît deux fois, pour comparer).
+- Appli : plateforme en tête des infos de chaque offre, bouton « Commander sur Deliveroo », réglage **Plateforme (Toutes / Uber Eats / Deliveroo)** affiché seulement si les données contiennent les deux.
+- Tests : `tests/test_deliveroo.py` (pages factices au format réel) ; `tests/conftest.py` interdit tout accès réseau pendant les tests (un test lançait une vraie récupération Deliveroo avant ce garde-fou).
+
+**Étude initiale :**
 
 - Deliveroo livre à Aix : la page `https://deliveroo.fr/fr/restaurants/aix-en-provence/aix-centre` liste **72 restaurants** (quartiers Centre, Les Milles, Pont de l'Arc…), contre environ 390 sur Uber Eats.
 - **Les données sont dans le HTML** (Next.js, `<script id="__NEXT_DATA__">`), obtenu par un simple `curl` sans navigateur (protection PerimeterX présente, mais pas bloquante le 27/10 depuis un PC) :

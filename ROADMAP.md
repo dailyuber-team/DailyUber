@@ -113,3 +113,7 @@
 3. ~~**Téléphone hors de chez toi**~~ : réglé par GitHub Pages (accessible partout).
 4. **Discord quotidien** : toujours souhaité une fois l'interface disponible ?
 5. **Calibrage des frais** : peux-tu fournir le détail d'une vraie commande (frais de service, livraison) pour remplacer l'estimation à 10 % ?
+
+## Hors plan d'origine — Deliveroo ✅ (27/10/2026)
+Deuxième plateforme, à la demande de l'utilisateur (CGU de Deliveroo : même interdiction que celles d'Uber Eats). Détails dans CONTEXT.md, section 7.
+- Reste à faire : calibrer les frais de service Deliveroo sur une vraie commande ; vérifier combien de fois un « 1 acheté = 1 offert » s'applique (compté une fois par prudence) ; affiner les créneaux (échantillonnés à 12 h, 13 h, 19 h, 20 h, 21 h).

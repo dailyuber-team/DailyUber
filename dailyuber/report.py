@@ -14,7 +14,8 @@ def format_basket(rank: int, b: Basket) -> str:
         eta = f"{s.eta_min} min" if s.eta_min == s.eta_max else f"{s.eta_min}-{s.eta_max} min"
     rating = f"{s.rating:.1f}★ ({s.rating_count})" if s.rating else "sans note"
     lines = [f"{rank}. {'🆕 ' if b.is_new else ''}{s.title}  —  {eur(b.per_person)}/pers  (total {eur(b.total)})"]
-    lines.append(f"   {rating} · {eta}" + (f" · {b.availability}" if b.availability else ""))
+    platform = {"uber": "Uber Eats", "deliveroo": "Deliveroo"}.get(s.platform, s.platform)
+    lines.append(f"   {platform} · {rating} · {eta}" + (f" · {b.availability}" if b.availability else ""))
     for it, qty in b.lines:
         custom = " *" if it.has_customizations else ""
         lines.append(f"   - {qty} × {it.title} ({eur(it.price)}){custom}")

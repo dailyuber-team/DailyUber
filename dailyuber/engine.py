@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from . import deliveroo
 from .models import Basket, Store
 from .parser import parse_feed_store, parse_store_details, parse_store_only, store_uuid_from_ref
 from .selection import select_deals
@@ -74,6 +75,12 @@ def fetch_raw(cfg: dict, progress=None) -> dict:
                 progress(i, len(targets), title)
     if not raw["stores"]:
         raise RuntimeError("Aucun menu récupéré")
+    if (cfg.get("deliveroo") or {}).get("enabled"):
+        # Deliveroo en plus : un échec (blocage, page modifiée) ne doit pas priver des offres Uber.
+        try:
+            raw["deliveroo"] = deliveroo.fetch_raw(cfg)
+        except Exception as e:
+            log.warning("Deliveroo : échec de la récupération (%s) ; offres Uber Eats seulement", e)
     path = _raw_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(gzip.compress(json.dumps(raw).encode()))
@@ -109,8 +116,9 @@ def build_stores(raw: dict) -> list[Store]:
     """Restaurants dont le menu a été récupéré. Un favori absent du flux est reconstruit
     à partir de son seul menu (getStoreV1)."""
     feed = {s.uuid: s for s in (parse_feed_store(r) for r in raw["feed"])}
-    return [parse_store_details(feed[uuid] if uuid in feed else parse_store_only(data), data)
+    uber = [parse_store_details(feed[uuid] if uuid in feed else parse_store_only(data), data)
             for uuid, data in raw["stores"].items()]
+    return uber + deliveroo.build_stores(raw.get("deliveroo"))
 
 
 def build_catalog(raw: dict) -> list[Store]:

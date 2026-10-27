@@ -70,6 +70,15 @@ def item_cost(item: Item, qty: int) -> tuple[float, int]:
     return round(item.price * (qty - free), 2), free
 
 
+def platform_fees(fees_cfg: dict, platform: str) -> dict:
+    """Frais d'une plateforme : ceux de `fees` (Uber Eats), remplacés par `fees.platforms.<nom>`.
+    Uber One ne s'applique qu'à Uber Eats."""
+    if platform == "uber":
+        return fees_cfg
+    over = (fees_cfg.get("platforms") or {}).get(platform) or {}
+    return {**fees_cfg, **over, "uber_one": {**(fees_cfg.get("uber_one") or {}), "enabled": False}}
+
+
 def uber_one_applies(items_subtotal: float, fees_cfg: dict) -> bool:
     one = fees_cfg.get("uber_one") or {}
     return bool(one.get("enabled")) and items_subtotal >= one["min_subtotal"]
@@ -77,6 +86,7 @@ def uber_one_applies(items_subtotal: float, fees_cfg: dict) -> bool:
 
 def compute_fees(items_subtotal: float, store: Store, fees_cfg: dict) -> tuple[float, float, float]:
     """(frais de livraison, frais de service, frais de petite commande)."""
+    fees_cfg = platform_fees(fees_cfg, store.platform)
     delivery = store.delivery_fee if store.delivery_fee is not None else fees_cfg["default_delivery_fee"]
     if store.free_delivery_min is not None and items_subtotal >= store.free_delivery_min:
         delivery = 0.0
@@ -104,6 +114,7 @@ def best_threshold_discount(items_subtotal: float, store: Store) -> tuple[float,
 
 
 def build_basket(store: Store, people: int, lines: list[tuple[Item, int]], fees_cfg: dict) -> Basket:
+    fees_cfg = platform_fees(fees_cfg, store.platform)
     subtotal, promos = 0.0, []
     for it, qty in lines:
         cost, free = item_cost(it, qty)
@@ -187,11 +198,14 @@ def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg:
         return None
     candidates = mains[:MAX_CANDIDATES] + [it for it in mains[MAX_CANDIDATES:] if it.bogo_get]
 
+    fees_cfg = platform_fees(fees_cfg, store.platform)
     floors = {0, fees_cfg["small_order_threshold"], *(p.min_subtotal for p in store.threshold_promos)}
     if store.free_delivery_min is not None:
         floors.add(store.free_delivery_min)
     if (fees_cfg.get("uber_one") or {}).get("enabled"):
         floors.add(fees_cfg["uber_one"]["min_subtotal"])
+    if store.min_order:  # en dessous, la commande est refusée : aucun panier plus petit
+        floors = {f for f in floors if f > store.min_order} | {store.min_order}
     best = None
     for floor in sorted(floors):
         lines = _min_subtotal_lines(candidates, people, round(floor * 100), min_distinct)
@@ -255,7 +269,8 @@ def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None =
         # Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
         kept, seen = [], set()
         for b in baskets:
-            keys = {("brand", brand_key(b.store.title)), ("compo", _composition_key(b))}
+            # Par plateforme : le même restaurant sur Uber Eats et Deliveroo reste visible deux fois.
+            keys = {("brand", b.store.platform, brand_key(b.store.title)), ("compo", b.store.platform, _composition_key(b))}
             if keys & seen:
                 continue
             seen |= keys

@@ -67,7 +67,8 @@ def random_store(rng: random.Random, i: int, fetched_at: datetime) -> Store:
         eta_min=eta, eta_max=None if eta is None else eta + rng.choice([0, 10, 20]),
         delivery_fee=rng.choice([None, None, 0.0, 0.99, 1.49]), free_delivery_min=rng.choice([None, None, 15.0, 20.0]),
         threshold_promos=promos, is_open=rng.random() < 0.8, open_until=rng.choice(["", "Ouvert jusqu'à 22:00", "Ouvre à 18:00"]),
-        hours=hours, delivery_slots=slots, cuisines=rng.sample(CUISINES, rng.randint(0, 2)), items=items)
+        hours=hours, delivery_slots=slots, cuisines=rng.sample(CUISINES, rng.randint(0, 2)), items=items,
+        platform=rng.choice(["uber", "uber", "deliveroo"]), min_order=rng.choice([None, None, 10.0, 15.0]))
 
 
 def cases_for(fetched_at: datetime, rng: random.Random, n: int) -> list[dict]:

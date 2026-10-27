@@ -39,6 +39,8 @@ class Store:
     hours: dict[int, list[tuple[int, int]]] | None = None             # voir hours.parse_hours
     delivery_slots: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
     cuisines: list[str] = field(default_factory=list)  # "Italienne", "Sushis"... (cuisineList)
+    platform: str = "uber"               # "uber" ou "deliveroo"
+    min_order: float | None = None       # montant minimum de commande (Deliveroo), sous-total des articles
     lat: float | None = None             # position du restaurant (rayon "autour de moi" de l'appli)
     lng: float | None = None
     items: list[Item] = field(default_factory=list)

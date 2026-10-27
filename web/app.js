@@ -5,6 +5,9 @@ import { availability, bestBaskets, hhmm, parisParts, parisToMs, rankDeals } fro
 const PREFS_KEY = "dailyuber:prefs";
 const FAVS_KEY = "dailyuber:favorites"; // [{uuid, title, url}] : titre et lien gardés si le restaurant disparaît
 const TABS = [["deals", "Offres"], ["favs", "Favoris"]];
+const PLATFORMS = { uber: "Uber Eats", deliveroo: "Deliveroo" };
+const platformOf = (s) => s.platform || (String(s.uuid).startsWith("deliveroo:") ? "deliveroo" : "uber");
+const platformName = (s) => PLATFORMS[platformOf(s)] || platformOf(s);
 const PEOPLE = [1, 2, 3, 4, 5, 6];
 const WHEN = [["now", "Maintenant"], ["today", "Aujourd'hui"], ["tomorrow", "Demain"]];
 const TOP_N = 10;
@@ -36,7 +39,7 @@ let memo = { key: "", baskets: [] }; // paniers du dernier calcul : le budget ne
 
 function loadPrefs() {
   const defaults = { tab: "deals", people: 2, when: "now", time: defaultTime(), budget: 10, uberOne: false, types: [],
-    nearMe: false, radiusKm: 2 };
+    nearMe: false, radiusKm: 2, platform: "all" };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") };
   } catch {
@@ -167,6 +170,12 @@ function setupControls() {
   segmented($("tab"), TABS, prefs.tab, (v) => { prefs.tab = v; changed(); });
   segmented($("people"), PEOPLE.map((n) => [n, n]), prefs.people, (v) => { prefs.people = Number(v); changed(); });
   segmented($("when"), WHEN, prefs.when, (v) => { prefs.when = v; changed(); });
+  // Réglage affiché seulement si la recherche du jour couvre plusieurs plateformes.
+  const platforms = [...new Set(data.stores.map((s) => s.platform || "uber"))];
+  $("platform-row").hidden = platforms.length < 2;
+  if (!platforms.includes(prefs.platform)) prefs.platform = "all";
+  segmented($("platform"), [["all", "Toutes"], ...platforms.map((p) => [p, PLATFORMS[p] || p])], prefs.platform,
+    (v) => { prefs.platform = v; changed(); });
 
   $("time").value = prefs.time;
   $("time").addEventListener("change", (e) => { prefs.time = e.target.value || prefs.time; changed(); });
@@ -276,10 +285,13 @@ function render() {
     memo = { key, baskets: bestBaskets(data.stores, cfg, {
       people: prefs.people, whenMs, nowMs: Date.parse(data.fetched_at), mealTypes: prefs.types }) };
   }
-  // Le rayon ne fait que filtrer les paniers déjà calculés, comme le budget.
-  const pool = nearActive()
-    ? memo.baskets.filter((b) => { const d = storeDistance(b.store); return d !== null && d <= prefs.radiusKm; })
-    : memo.baskets;
+  // Le rayon et la plateforme ne font que filtrer les paniers déjà calculés, comme le budget.
+  const pool = memo.baskets.filter((b) => {
+    if (prefs.platform !== "all" && (b.store.platform || "uber") !== prefs.platform) return false;
+    if (!nearActive()) return true;
+    const d = storeDistance(b.store);
+    return d !== null && d <= prefs.radiusKm;
+  });
   const deals = rankDeals(pool, cfg, TOP_N, "rating");
 
   const n = deals.length;
@@ -350,7 +362,7 @@ function favButton(uuid) {
 }
 
 function storeMeta(s) {
-  const meta = [];
+  const meta = [`<span class="platform">${esc(platformName(s))}</span>`];
   if (s.rating) meta.push(`${ICONS.star}${s.rating.toFixed(1).replace(".", ",")}${s.rating_count ? ` (${count.format(s.rating_count)})` : ""}`);
   if (s.eta_min) meta.push(s.eta_min === s.eta_max || !s.eta_max ? `${s.eta_min} min` : `${s.eta_min}–${s.eta_max} min`);
   const d = storeDistance(s);
@@ -372,7 +384,7 @@ function infoCard(s, reason) {
       ${favButton(s.uuid)}
     </div>
     <p class="deal-reason">${esc(reason)}</p>
-    ${s.url ? `<a class="order secondary" href="${esc(s.url)}" target="_blank" rel="noopener">Voir sur Uber Eats ${ICONS.arrow}</a>` : ""}
+    ${s.url ? `<a class="order secondary" href="${esc(s.url)}" target="_blank" rel="noopener">Voir sur ${esc(platformName(s))} ${ICONS.arrow}</a>` : ""}
   </li>`;
 }
 
@@ -432,7 +444,7 @@ function dealCard(b, k, { favorites = false } = {}) {
       <summary><span>Total <strong>${euro.format(b.total)}</strong></span><span class="more">Détail ${ICONS.chevron}</span></summary>
       <dl class="breakdown">${rows.map(([l, v]) => `<dt>${l}</dt><dd>${v < 0 ? "−" : ""}${euro.format(Math.abs(v))}</dd>`).join("")}</dl>
     </details>
-    <a class="order" href="${esc(s.url)}" target="_blank" rel="noopener">Commander sur Uber Eats ${ICONS.arrow}</a>
+    <a class="order" href="${esc(s.url)}" target="_blank" rel="noopener">Commander sur ${esc(platformName(s))} ${ICONS.arrow}</a>
   </li>`;
 }
 

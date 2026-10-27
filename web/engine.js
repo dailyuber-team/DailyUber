@@ -110,12 +110,23 @@ export function itemCost(it, qty) {
   return [pyRound(it.price * (qty - free), 2), free];
 }
 
+/** Frais d'une plateforme : ceux de `fees` (Uber Eats), remplacés par `fees.platforms.<nom>`.
+ *  Uber One ne s'applique qu'à Uber Eats. (platform_fees de selection.py) */
+export function platformFees(fees, platform) {
+  if (!platform || platform === "uber") return fees;
+  fees._byPlatform ??= {};
+  return (fees._byPlatform[platform] ??= {
+    ...fees, ...((fees.platforms || {})[platform] || {}), uber_one: { ...(fees.uber_one || {}), enabled: false },
+  });
+}
+
 function uberOneApplies(subtotal, fees) {
   const one = fees.uber_one || {};
   return Boolean(one.enabled) && subtotal >= one.min_subtotal;
 }
 
 export function computeFees(subtotal, store, fees) {
+  fees = platformFees(fees, store.platform);
   let delivery = store.delivery_fee != null ? store.delivery_fee : fees.default_delivery_fee;
   if (store.free_delivery_min != null && subtotal >= store.free_delivery_min) delivery = 0.0;
   let service = Math.min(Math.max(subtotal * fees.service_fee_pct, fees.service_fee_min), fees.service_fee_max);
@@ -140,6 +151,7 @@ function bestThresholdDiscount(subtotal, store) {
 }
 
 function buildBasket(store, people, lines, fees) {
+  fees = platformFees(fees, store.platform);
   let subtotal = 0.0;
   const promos = [];
   for (const [it, qty] of lines) {
@@ -214,9 +226,13 @@ function bestBasket(store, people, fees, minDistinct, itemFilter) {
   if (mains.length < minDistinct || !mains.length) return null;
   const candidates = mains.slice(0, MAX_CANDIDATES).concat(mains.slice(MAX_CANDIDATES).filter((it) => it.bogo_get));
 
-  const floors = new Set([0, fees.small_order_threshold, ...store.threshold_promos.map((p) => p.min_subtotal)]);
+  fees = platformFees(fees, store.platform);
+  let floors = new Set([0, fees.small_order_threshold, ...store.threshold_promos.map((p) => p.min_subtotal)]);
   if (store.free_delivery_min != null) floors.add(store.free_delivery_min);
   if ((fees.uber_one || {}).enabled) floors.add(fees.uber_one.min_subtotal);
+  if (store.min_order) { // en dessous, la commande est refusée : aucun panier plus petit
+    floors = new Set([...floors].filter((f) => f > store.min_order).concat([store.min_order]));
+  }
   const tables = centsTables(candidates, people);
   let best = null;
   for (const floor of [...floors].sort((a, b) => a - b)) {
@@ -294,7 +310,9 @@ export function rankDeals(all, cfg, topN = 10, sort = "score") {
   // Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
   const kept = [], seen = new Set();
   for (const b of baskets) {
-    const keys = [`brand:${brandKey(b.store.title)}`, `compo:${compositionKey(b)}`];
+    // Par plateforme : le même restaurant sur Uber Eats et Deliveroo reste visible deux fois.
+    const p = b.store.platform || "uber";
+    const keys = [`brand:${p}:${brandKey(b.store.title)}`, `compo:${p}:${compositionKey(b)}`];
     if (keys.some((k) => seen.has(k))) continue;
     keys.forEach((k) => seen.add(k));
     kept.push(b);

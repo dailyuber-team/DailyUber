@@ -2,7 +2,7 @@
 
 Trouve les meilleurs plans Uber Eats autour d'Aix-en-Provence pour manger de 1 à 6 personnes **à moins de 10 € par personne**, frais compris.
 
-L'outil parcourt les restaurants livrables, lit leurs menus et leurs promos (1 acheté = 1 offert, -20 % dès X €…), compose le panier le moins cher, puis ajoute les frais de livraison et de service. Il affiche le top 5 des offres pour chaque taille de groupe.
+L'outil parcourt les restaurants livrables sur **Uber Eats et Deliveroo**, lit leurs menus et leurs promos (1 acheté = 1 offert, -20 % dès X €…), compose le panier le moins cher, puis ajoute les frais de livraison et de service. Il affiche le top 5 des offres pour chaque taille de groupe.
 
 ## L'appli sur téléphone
 
@@ -11,7 +11,7 @@ L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fo
 - chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul, sur **tous** les restaurants bien notés (environ 200, un quart d'heure de recherche), et publie les offres ;
 - dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
 - **Autour de moi** : n'affiche que les restaurants à moins de 0,5 à 5 km de ta position (le téléphone demande l'autorisation de localisation ; la position n'est pas enregistrée). La recherche, elle, est toujours faite depuis le centre d'Aix ;
-- le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats ;
+- chaque offre indique sa plateforme ; le bouton « Commander sur Uber Eats » ou « Commander sur Deliveroo » ouvre le restaurant ; le réglage **Plateforme** permet de n'en voir qu'une ;
 - l'onglet **Favoris** montre directement tes restaurants préférés (voir plus bas).
 
 **L'installer comme une vraie appli** : sur iPhone, ouvre le lien dans Safari, touche le bouton Partager puis « Sur l'écran d'accueil ». Sur Android, ouvre-le dans Chrome, menu ⋮ puis « Ajouter à l'écran d'accueil ».
@@ -120,6 +120,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `scoring` | Poids du prix, de la note et du délai dans le classement |
 | `fetch` | Nombre de restaurants analysés (40 sur le PC ; `0` = tous), délai entre les requêtes, durée du cache |
 | `favorites` | Restaurants toujours analysés et affichés dans l'onglet Favoris (liens Uber Eats) |
+| `deliveroo` | Deliveroo activé ou non, quartier de la page de liste, heures interrogées |
 
 ## Tests
 
@@ -132,7 +133,8 @@ L'appli refait le calcul en JavaScript ([web/engine.js](web/engine.js)) : toute 
 ## À savoir
 
 - **Les frais de service sont estimés** (10 % du panier, entre 0,99 € et 4,99 €) : Uber ne donne le montant exact qu'au paiement. Le prix réel peut donc varier un peu.
-- On ne se connecte jamais à un compte Uber. L'outil lit les données publiques du site, ce que les CGU d'Uber n'autorisent pas : à garder pour un usage perso et modéré.
+- On ne se connecte jamais à un compte Uber ou Deliveroo. L'outil lit les données publiques des sites, ce que leurs CGU n'autorisent pas : à garder pour un usage perso et modéré.
+- **Deliveroo** n'affiche pas ses horaires : l'outil regarde quels restaurants livrent à quelques heures (12 h, 13 h, 19 h, 20 h, 21 h, aujourd'hui et demain). Une commande à une autre heure, ou après-demain, peut donc manquer des restaurants Deliveroo. Ses frais de service sont estimés comme ceux d'Uber, et un « 1 acheté = 1 offert » est compté une seule fois par commande, par prudence.
 - **Uber One** : livraison à 0 € et frais de service réduits de 50 % dès 12 € d'articles. Uber annonce « jusqu'à 50 % », donc l'économie réelle peut être un peu plus faible.
 - Les promos « article offert » sont signalées mais pas comptées dans le prix.
 - Chaque offre indique jusqu'à quand le restaurant est ouvert, ou le créneau de livraison retenu. Pour une commande à l'avance, le menu et les prix sont ceux du moment de la recherche (une formule midi peut apparaître pour le soir).
