@@ -17,6 +17,7 @@ const deals = cases.map((c) => {
     nowMs: Date.parse(data.fetched_at),
     mealTypes: c.meal_types,
     topN: c.top_n,
+    sort: c.sort,
   });
   return baskets.map((b) => ({
     uuid: b.store.uuid,

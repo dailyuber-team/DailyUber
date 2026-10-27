@@ -225,9 +225,10 @@ def _composition_key(b: Basket) -> tuple:
 
 def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None = None,
                  when: datetime | None = None, now: datetime | None = None,
-                 meal_types: list[str] | None = None) -> dict[int, list[Basket]]:
+                 meal_types: list[str] | None = None, sort: str = "score") -> dict[int, list[Basket]]:
     """Top N par taille de groupe. `when` : heure de livraison visée (None = maintenant).
-    `meal_types` : ne garder que les plats de ces types (None ou vide = tous)."""
+    `meal_types` : ne garder que les plats de ces types (None ou vide = tous).
+    `sort` : "score" (prix, note et délai pondérés) ou "rating" (mieux noté d'abord)."""
     classifier = MealClassifier(cfg["meal"])
     types = MealTypes(cfg.get("meal_types") or {}) if meal_types else None
     wanted = set(meal_types or [])
@@ -246,7 +247,11 @@ def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None =
                 b.score = score_basket(b, cfg)
                 b.availability = available[store.uuid]
                 baskets.append(b)
-        baskets.sort(key=lambda b: b.score, reverse=True)
+        if sort == "rating":
+            # Mieux noté d'abord, à 0,1 près comme affiché (sans note : à la fin), puis le moins cher.
+            baskets.sort(key=lambda b: (-round(b.store.rating or 0, 1), b.per_person))
+        else:
+            baskets.sort(key=lambda b: b.score, reverse=True)
         # Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
         kept, seen = [], set()
         for b in baskets:

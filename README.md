@@ -91,6 +91,7 @@ La première recherche prend environ 3 minutes. Les données sont ensuite gardé
 | `--uber-one` / `--no-uber-one` | Calcule les prix avec ou sans l'abonnement Uber One |
 | `--type TYPE …` | Seulement certains types de repas : `burger`, `crousty`, `pizza`, `sushi`, `asiatique`, `poke`, `tacos_kebab`, `sandwich`, `salade`, `pates`, `poulet` |
 | `--budget EUR` | Prix max par personne (par défaut : 10 €) |
+| `--sort rating` | Classe les mieux notés d'abord, puis les moins chers (par défaut : `score`, qui mélange prix, note et délai) ; l'appli classe toujours par note |
 | `--refresh` | Force une nouvelle récupération, même si le cache est récent |
 | `--offline` | Réutilise les dernières données, même si elles sont anciennes |
 | `--config chemin` | Utilise un autre fichier de configuration |

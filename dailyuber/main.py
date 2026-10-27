@@ -22,7 +22,7 @@ def when_label(when: datetime | None) -> str:
 
 def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
         when: datetime | None = None, uber_one: bool | None = None,
-        meal_types: list[str] | None = None, budget: float | None = None) -> str:
+        meal_types: list[str] | None = None, budget: float | None = None, sort: str = "score") -> str:
     if offline:
         raw = engine.load_cached_raw(cfg)
         if raw is None:
@@ -33,7 +33,7 @@ def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
     cfg = engine.with_uber_one(cfg, uber_one)
     if budget is not None:
         cfg["selection"]["max_price_per_person"] = budget
-    deals = engine.select(stores, cfg, people, when, meal_types=meal_types)
+    deals = engine.select(stores, cfg, people, when, meal_types=meal_types, sort=sort)
     if when is None:  # l'historique "nouveau depuis la veille" ne suit que les recherches immédiates
         mark_new_and_save(deals, cfg["storage"]["data_dir"])
     stats = {"address": cfg["address"]["label"], "fetched_at": raw.get("fetched_at", "?"),
@@ -57,6 +57,8 @@ def main() -> int:
     ap.add_argument("--type", nargs="+", metavar="TYPE", dest="meal_types",
                     help="types de repas (meal_types dans config.yaml : burger, pizza, sushi...)")
     ap.add_argument("--budget", type=float, metavar="EUR", help="prix max par personne (défaut : config.yaml)")
+    ap.add_argument("--sort", choices=["score", "rating"], default="score",
+                    help="classement : score (prix, note, délai ; défaut) ou rating (mieux noté d'abord)")
     ap.add_argument("--config", help="chemin vers config.yaml")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -68,7 +70,7 @@ def main() -> int:
     try:
         when = resolve_target(args.at, args.on, datetime.now(PARIS))
         print(run(cfg, args.offline, args.refresh, args.people, when, args.uber_one,
-                  args.meal_types, args.budget))
+                  args.meal_types, args.budget, args.sort))
     except Exception:
         log.exception("Échec du run")
         return 1

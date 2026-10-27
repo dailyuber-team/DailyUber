@@ -252,7 +252,7 @@ function compositionKey(b) {
  * visée ; `nowMs` : instant de référence de l'ouverture (l'heure de la récupération).
  */
 export function selectDeals(stores, cfg, opts) {
-  return rankDeals(bestBaskets(stores, cfg, opts), cfg, opts.topN ?? 10);
+  return rankDeals(bestBaskets(stores, cfg, opts), cfg, opts.topN ?? 10, opts.sort ?? "score");
 }
 
 /** Meilleur panier de chaque restaurant disponible, sans tenir compte du budget. */
@@ -276,12 +276,18 @@ export function bestBaskets(stores, cfg, { people, whenMs = null, nowMs, mealTyp
   return baskets;
 }
 
-/** Paniers sous le budget, classés par score, une seule fois par enseigne. Rapide : le curseur
- *  de budget ne recalcule que cette étape. */
-export function rankDeals(all, cfg, topN = 10) {
+/** Paniers sous le budget, classés par score ("score") ou par note ("rating"), une seule fois
+ *  par enseigne. Rapide : le curseur de budget ne recalcule que cette étape. */
+export function rankDeals(all, cfg, topN = 10, sort = "score") {
   const baskets = all.filter((b) => b.per_person < cfg.selection.max_price_per_person);
   for (const b of baskets) b.score = scoreBasket(b, cfg);
-  baskets.sort((a, b) => b.score - a.score);
+  if (sort === "rating") {
+    // Mieux noté d'abord, à 0,1 près comme affiché (sans note : à la fin), puis le moins cher.
+    const r = (b) => pyRound(b.store.rating || 0, 1);
+    baskets.sort((a, b) => r(b) - r(a) || a.per_person - b.per_person);
+  } else {
+    baskets.sort((a, b) => b.score - a.score);
+  }
   // Une même enseigne (ou un même panier sous deux noms) n'apparaît qu'une fois.
   const kept = [], seen = new Set();
   for (const b of baskets) {

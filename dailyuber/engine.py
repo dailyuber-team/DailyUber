@@ -129,6 +129,6 @@ def with_uber_one(cfg: dict, enabled: bool | None) -> dict:
 
 def select(stores: list[Store], cfg: dict, people: list[int] | None = None,
            when: datetime | None = None, uber_one: bool | None = None,
-           meal_types: list[str] | None = None) -> dict[int, list[Basket]]:
+           meal_types: list[str] | None = None, sort: str = "score") -> dict[int, list[Basket]]:
     cfg = with_uber_one(cfg, uber_one)
-    return select_deals(stores, cfg, people or cfg["selection"]["group_sizes"], when, meal_types=meal_types)
+    return select_deals(stores, cfg, people or cfg["selection"]["group_sizes"], when, meal_types=meal_types, sort=sort)

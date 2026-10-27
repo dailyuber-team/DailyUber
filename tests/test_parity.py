@@ -77,7 +77,7 @@ def cases_for(fetched_at: datetime, rng: random.Random, n: int) -> list[dict]:
              datetime(tomorrow.year, tomorrow.month, tomorrow.day, 21, 0, tzinfo=PARIS)]
     types = [None, ["pizza"], ["sushi", "poke"], ["burger", "poulet"], ["salade"]]
     return [{"people": rng.randint(1, 6), "uber_one": rng.random() < 0.5, "budget": rng.choice([8.0, 10.0, 12.5, 15.0]),
-             "meal_types": rng.choice(types), "top_n": rng.choice([5, 10]),
+             "meal_types": rng.choice(types), "top_n": rng.choice([5, 10]), "sort": rng.choice(["score", "rating"]),
              "when": (w := rng.choice(whens)) and w.isoformat()} for _ in range(n)]
 
 
@@ -87,7 +87,7 @@ def python_deals(stores: list[Store], cfg: dict, fetched_at: datetime, c: dict) 
     cfg["selection"]["max_price_per_person"] = c["budget"]
     cfg["selection"]["top_n"] = c["top_n"]
     when = datetime.fromisoformat(c["when"]) if c["when"] else None
-    deals = select_deals(stores, cfg, [c["people"]], when, now=fetched_at, meal_types=c["meal_types"])
+    deals = select_deals(stores, cfg, [c["people"]], when, now=fetched_at, meal_types=c["meal_types"], sort=c["sort"])
     return [{"uuid": b.store.uuid, "lines": [[it.title, q] for it, q in b.lines],
              "items_subtotal": b.items_subtotal, "threshold_discount": b.threshold_discount,
              "delivery_fee": b.delivery_fee, "service_fee": b.service_fee, "small_order_fee": b.small_order_fee,

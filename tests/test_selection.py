@@ -316,3 +316,15 @@ def test_always_excluded_keywords_beat_main_keywords():
     assert not c.is_main(Item("Crousty Nutella Banane", 6.5))
     assert c.is_main(Item("Crousty poulet", 8.0))
     assert MealClassifier(MEAL).is_main(Item("Menu burger frites", 9.0))  # sans la liste : inchangé
+
+
+def test_select_deals_sorted_by_rating_then_price():
+    now = __import__("datetime").datetime(2026, 10, 22, 12, 0, tzinfo=__import__("dailyuber.hours", fromlist=["PARIS"]).PARIS)
+    stores = [store([Item("Menu", 6.0)], uuid="cheap", title="Pas cher"),            # 4.5 (défaut du helper)
+              Store(uuid="top", title="Top", url="u", rating=4.81, eta_min=40, eta_max=45, items=[Item("Menu", 7.5)]),
+              Store(uuid="top2", title="Top bis", url="u", rating=4.84, eta_min=10, eta_max=20, items=[Item("Menu", 7.0)]),
+              Store(uuid="none", title="Sans note", url="u", items=[Item("Menu", 5.0)])]
+    ids = lambda sort: [b.store.uuid for b in select_deals(stores, CFG, [2], now=now, sort=sort)[2]]
+    assert ids("score")[0] == "cheap"
+    # 4,81 et 4,84 s'affichent tous deux "4,8" : à égalité, le moins cher passe devant.
+    assert ids("rating") == ["top2", "top", "cheap", "none"]

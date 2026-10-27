@@ -199,13 +199,13 @@ function render() {
     renderFavorites(cfg, whenMs);
     return;
   }
-  $("results-caption").textContent = "Classées par prix, note et rapidité";
+  $("results-caption").textContent = "Les mieux notés d'abord, puis les moins chers";
   const key = [prefs.people, prefs.uberOne, prefs.types.join(","), Math.floor(whenMs / 60000), data.fetched_at].join("|");
   if (key !== memo.key) {
     memo = { key, baskets: bestBaskets(data.stores, cfg, {
       people: prefs.people, whenMs, nowMs: Date.parse(data.fetched_at), mealTypes: prefs.types }) };
   }
-  const deals = rankDeals(memo.baskets, cfg, TOP_N);
+  const deals = rankDeals(memo.baskets, cfg, TOP_N, "rating");
 
   const n = deals.length;
   $("results-title").textContent = n ? `${n} offre${n > 1 ? "s" : ""} pour ${prefs.people}` : "Aucune offre";
