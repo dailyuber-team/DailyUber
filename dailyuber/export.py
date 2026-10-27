@@ -18,7 +18,7 @@ from .models import Store
 from .selection import MealClassifier, MealTypes
 
 log = logging.getLogger("dailyuber")
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2  # 2 : catalog et favorites
 
 
 def paris_fetched_at(raw: dict) -> datetime:
@@ -27,7 +27,10 @@ def paris_fetched_at(raw: dict) -> datetime:
     return t.astimezone(PARIS)  # une date naïve est interprétée comme heure locale
 
 
-def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime) -> dict:
+def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime,
+                  catalog: list[Store] | None = None, favorites: list[str] | None = None) -> dict:
+    """`catalog` : tous les restaurants du flux, exportés en version légère (sans menu) pour
+    chercher et afficher un favori. `favorites` : UUID des favoris de config.yaml."""
     classifier, types = MealClassifier(cfg["meal"]), MealTypes(cfg["meal_types"])
     out = []
     for s in stores:
@@ -48,6 +51,12 @@ def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime) -> dict:
             "delivery_slots": s.delivery_slots,
             "items": items,
         })
+    exported = {s["uuid"] for s in out}
+    light = {}
+    for s in [*stores, *(catalog or [])]:  # menu récupéré d'abord : infos les plus complètes
+        if s.uuid not in exported and s.uuid not in light:
+            light[s.uuid] = {"uuid": s.uuid, "title": s.title, "url": s.url, "rating": s.rating,
+                             "rating_count": s.rating_count, "eta_min": s.eta_min, "eta_max": s.eta_max}
     sel = cfg["selection"]
     return {
         "version": FORMAT_VERSION,
@@ -62,6 +71,8 @@ def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime) -> dict:
         },
         "meal_types": [{"id": t, "label": c["label"]} for t, c in cfg["meal_types"].items()],
         "stores": out,
+        "catalog": list(light.values()),
+        "favorites": favorites or [],
     }
 
 
@@ -79,7 +90,8 @@ def main() -> int:
         raw = engine.load_cached_raw(cfg) if args.offline else engine.get_raw(cfg, refresh=args.refresh)
         if raw is None:
             raise RuntimeError("Pas de données en cache : lancer sans --offline")
-        data = export_stores(engine.build_stores(raw), cfg, paris_fetched_at(raw))
+        data = export_stores(engine.build_stores(raw), cfg, paris_fetched_at(raw),
+                             engine.build_catalog(raw), raw.get("favorites", []))
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

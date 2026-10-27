@@ -10,7 +10,8 @@ L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fo
 
 - chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul et publie les offres ;
 - dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
-- le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats.
+- le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats ;
+- l'onglet **Favoris** montre directement tes restaurants préférés (voir plus bas).
 
 **L'installer comme une vraie appli** : sur iPhone, ouvre le lien dans Safari, touche le bouton Partager puis « Sur l'écran d'accueil ». Sur Android, ouvre-le dans Chrome, menu ⋮ puis « Ajouter à l'écran d'accueil ».
 
@@ -33,6 +34,16 @@ Pour relancer une recherche tout de suite : onglet **Actions** du dépôt GitHub
 ```
 
 Puis ouvrir http://localhost:8765 dans le navigateur.
+
+## Favoris
+
+- **Dans l'appli** : touche l'étoile ☆ d'une offre, ou cherche un restaurant par son nom en bas de l'onglet **Favoris**. L'onglet affiche pour chaque favori son meilleur panier avec tes réglages (personnes, heure, Uber One), même s'il dépasse ton budget, ou dit pourquoi il n'y en a pas (fermé, menu pas analysé…). Ces étoiles restent sur ton téléphone.
+- **Pour qu'un favori soit vérifié chaque jour** : la recherche automatique n'analyse qu'une quarantaine de restaurants. Ajoute le lien Uber Eats du restaurant dans `favorites` de [config.yaml](config.yaml) : il sera toujours analysé, et marqué « Suivi chaque jour » dans l'appli.
+
+```yaml
+favorites:
+  - https://www.ubereats.com/fr/store/pekyo/o1RM0wMxRn6Xy4keWIR-AA
+```
 
 ## Installation
 
@@ -98,6 +109,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `meal_types` | Les types de repas proposés et leurs mots-clés |
 | `scoring` | Poids du prix, de la note et du délai dans le classement |
 | `fetch` | Nombre de restaurants analysés, délai entre les requêtes, durée du cache |
+| `favorites` | Restaurants toujours analysés et affichés dans l'onglet Favoris (liens Uber Eats) |
 
 ## Tests
 
@@ -117,5 +129,5 @@ L'appli refait le calcul en JavaScript ([web/engine.js](web/engine.js)) : toute 
 
 ## Pour aller plus loin
 
-- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (choix de zone, favoris…).
+- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (choix de zone, message Discord…).
 - [CONTEXT.md](CONTEXT.md) : les détails techniques.

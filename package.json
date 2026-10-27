@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Déclare les fichiers .js du projet (web/engine.js…) comme modules ES, quel que soit le package.json des dossiers parents.",
+  "type": "module"
+}

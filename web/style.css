@@ -292,6 +292,61 @@ button { cursor: pointer; }
 .order:active { opacity: 0.8; transform: scale(0.99); }
 .order svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
 
+/* --- Onglets Offres / Favoris --- */
+
+.tabs { margin: 0 0 16px; }
+.tabs button { height: 32px; }
+
+/* --- Favoris --- */
+
+.deal-side { flex: none; display: flex; align-items: flex-start; gap: 6px; }
+.fav-btn {
+  flex: none; display: grid; place-items: center;
+  width: 32px; height: 32px; margin: -4px -6px 0 0; padding: 0;
+  border: 0; border-radius: 16px; background: none;
+  color: var(--label-3);
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.fav-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.fav-btn[aria-pressed="true"] { color: var(--label); }
+.fav-btn[aria-pressed="true"] svg { fill: currentColor; }
+.fav-btn:active:not(:disabled) { transform: scale(0.88); }
+.fav-btn:disabled { cursor: default; }
+.deal-side .fav-btn { order: 2; }
+
+.deal-price.over strong { color: var(--label-2); }
+.deal-tag {
+  display: inline-block; margin: 6px 0 0; padding: 2px 8px; border-radius: 6px;
+  background: var(--fill); font-size: 12px; font-weight: 600;
+}
+.deal-muted .deal-name { color: var(--label-2); }
+.deal-reason { margin: 10px 0 0; color: var(--label-2); font-size: 15px; }
+.order.secondary { background: var(--fill); color: var(--label); }
+
+.fav-add .section-title { margin-top: 28px; }
+.search {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 40px; padding: 0 14px;
+  border: 0; border-radius: 10px;
+  background: var(--card);
+}
+.search::placeholder { color: var(--label-3); }
+.fav-add .results-caption { display: block; margin: 6px 4px 0; }
+.matches { list-style: none; margin: 10px 0 0; padding: 0; background: var(--card); border-radius: var(--radius); overflow: hidden; }
+.matches:empty { display: none; }
+.matches li { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 6px 12px 6px 16px; }
+.matches li + li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--separator); }
+.match-name { overflow-wrap: anywhere; }
+.match-meta { margin-left: 8px; color: var(--label-2); font-size: 13px; white-space: nowrap; }
+.match-meta .star { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 2px; fill: currentColor; }
+.matches button {
+  flex: none; height: 30px; padding: 0 12px;
+  border: 0; border-radius: 15px;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 14px; font-weight: 600;
+}
+.match-none { color: var(--label-2); font-size: 15px; }
+
 /* États vides, chargement, erreur */
 .empty {
   background: var(--card); border-radius: var(--radius);

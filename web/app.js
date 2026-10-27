@@ -1,8 +1,10 @@
 // Interface de DailyUber : charge data.json (recherche quotidienne) et recalcule les offres
 // dans le téléphone à chaque réglage, sans aucune requête vers Uber Eats.
-import { bestBaskets, hhmm, parisParts, parisToMs, rankDeals } from "./engine.js";
+import { availability, bestBaskets, hhmm, parisParts, parisToMs, rankDeals } from "./engine.js";
 
 const PREFS_KEY = "dailyuber:prefs";
+const FAVS_KEY = "dailyuber:favorites"; // [{uuid, title, url}] : titre et lien gardés si le restaurant disparaît
+const TABS = [["deals", "Offres"], ["favs", "Favoris"]];
 const PEOPLE = [1, 2, 3, 4, 5, 6];
 const WHEN = [["now", "Maintenant"], ["today", "Aujourd'hui"], ["tomorrow", "Demain"]];
 const TOP_N = 10;
@@ -14,6 +16,7 @@ const euroShort = new Intl.NumberFormat("fr-FR", { style: "currency", currency: 
 const count = new Intl.NumberFormat("fr-FR");
 
 const ICONS = {
+  fav: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17.1 6.6 20l1.1-6.1-4.5-4.3 6.1-.8z"/></svg>',
   star: '<svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>',
   chevron: '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>',
@@ -23,12 +26,14 @@ const ICONS = {
 
 let data = null;
 const prefs = loadPrefs();
+let favs = loadFavs();
+let index = new Map(); // uuid -> restaurant avec menu (data.stores) ou sans (data.catalog)
 let memo = { key: "", baskets: [] }; // paniers du dernier calcul : le budget ne fait que les filtrer
 
 // --- Préférences (mémorisées sur le téléphone) ---------------------------------------------
 
 function loadPrefs() {
-  const defaults = { people: 2, when: "now", time: defaultTime(), budget: 10, uberOne: false, types: [] };
+  const defaults = { tab: "deals", people: 2, when: "now", time: defaultTime(), budget: 10, uberOne: false, types: [] };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") };
   } catch {
@@ -38,6 +43,40 @@ function loadPrefs() {
 
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* navigation privée */ }
+}
+
+// --- Favoris (mémorisés sur le téléphone ; ceux de config.yaml viennent de data.json) ---------
+
+function loadFavs() {
+  try {
+    const list = JSON.parse(localStorage.getItem(FAVS_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((f) => f && f.uuid) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavs() {
+  try { localStorage.setItem(FAVS_KEY, JSON.stringify(favs)); } catch { /* navigation privée */ }
+}
+
+const configFavs = () => new Set(data.favorites || []);
+const isFav = (uuid) => configFavs().has(uuid) || favs.some((f) => f.uuid === uuid);
+
+/** Favoris dans l'ordre : ceux de config.yaml, puis ceux ajoutés sur le téléphone. */
+function favoriteUuids() {
+  return [...new Set([...(data.favorites || []), ...favs.map((f) => f.uuid)])];
+}
+
+function toggleFav(uuid) {
+  if (configFavs().has(uuid)) return; // défini dans config.yaml : on ne le retire pas d'ici
+  if (favs.some((f) => f.uuid === uuid)) favs = favs.filter((f) => f.uuid !== uuid);
+  else {
+    const s = index.get(uuid);
+    favs.push({ uuid, title: s ? s.title : "", url: s ? s.url : "" });
+  }
+  saveFavs();
+  changed();
 }
 
 /** Heure proposée par défaut : midi et demi le matin, 19h30 l'après-midi. */
@@ -70,6 +109,7 @@ function segmented(el, options, current, onChange) {
 }
 
 function setupControls() {
+  segmented($("tab"), TABS, prefs.tab, (v) => { prefs.tab = v; changed(); });
   segmented($("people"), PEOPLE.map((n) => [n, n]), prefs.people, (v) => { prefs.people = Number(v); changed(); });
   segmented($("when"), WHEN, prefs.when, (v) => { prefs.when = v; changed(); });
 
@@ -95,9 +135,27 @@ function setupControls() {
     else prefs.types = prefs.types.includes(t) ? prefs.types.filter((x) => x !== t) : [...prefs.types, t];
     changed();
   });
+
+  $("results").addEventListener("click", (e) => {
+    const b = e.target.closest(".fav-btn");
+    if (b) toggleFav(b.dataset.uuid);
+  });
+  $("fav-search").addEventListener("input", renderMatches);
+  $("fav-matches").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-uuid]");
+    if (!b) return;
+    toggleFav(b.dataset.uuid);
+    $("fav-search").value = "";
+    renderMatches();
+  });
 }
 
 function syncControls() {
+  const onFavs = prefs.tab === "favs";
+  $("types-section").hidden = onFavs; // l'onglet Favoris montre le meilleur panier, tous plats confondus
+  $("fav-add").hidden = !onFavs;
+  const n = favoriteUuids().length;
+  $("tab").querySelector('[data-value="favs"]').textContent = n ? `Favoris (${n})` : "Favoris";
   $("time-row").hidden = prefs.when === "now";
   $("budget-value").textContent = `${euroShort.format(prefs.budget)} / pers`;
   const b = $("budget");
@@ -137,6 +195,11 @@ function render() {
   const cfg = structuredClone(data.config);
   cfg.fees.uber_one.enabled = prefs.uberOne;
   cfg.selection.max_price_per_person = prefs.budget;
+  if (prefs.tab === "favs") {
+    renderFavorites(cfg, whenMs);
+    return;
+  }
+  $("results-caption").textContent = "Classées par prix, note et rapidité";
   const key = [prefs.people, prefs.uberOne, prefs.types.join(","), Math.floor(whenMs / 60000), data.fetched_at].join("|");
   if (key !== memo.key) {
     memo = { key, baskets: bestBaskets(data.stores, cfg, {
@@ -151,6 +214,87 @@ function render() {
   if (raise) raise.addEventListener("click", () => { prefs.budget = Number($("budget").max); $("budget").value = prefs.budget; changed(); });
   const all = $("all-types");
   if (all) all.addEventListener("click", () => { prefs.types = []; changed(); });
+}
+
+/** Onglet Favoris : meilleur panier de chaque favori avec les réglages du moment (personnes,
+ *  heure, Uber One), tous types de plats, même au-dessus du budget. */
+function renderFavorites(cfg, whenMs) {
+  const nowMs = Date.parse(data.fetched_at);
+  const deals = [], others = [];
+  for (const uuid of favoriteUuids()) {
+    const s = index.get(uuid);
+    if (!s) {
+      const f = favs.find((x) => x.uuid === uuid) || { uuid, title: "Restaurant", url: "" };
+      others.push(infoCard(f, "Absent de la recherche du jour : il ne livre peut-être pas à cette adresse aujourd'hui."));
+    } else if (!s.items) {
+      others.push(infoCard(s, configFavs().has(uuid)
+        ? "Menu pas récupéré aujourd'hui."
+        : "Menu pas analysé aujourd'hui : ajoute ce restaurant à « favorites » dans config.yaml pour qu'il le soit chaque jour."));
+    } else if (availability(s, whenMs, nowMs) === null) {
+      others.push(infoCard(s, prefs.when === "now" ? "Fermé en ce moment." : "Pas de livraison possible à cette heure."));
+    } else {
+      const b = bestBaskets([s], cfg, { people: prefs.people, whenMs, nowMs, mealTypes: null })[0];
+      if (b) deals.push(b);
+      else others.push(infoCard(s, "Aucun plat principal reconnu dans son menu."));
+    }
+  }
+  deals.sort((a, b) => a.per_person - b.per_person);
+  const n = deals.length + others.length;
+  $("results-title").textContent = n ? `${n} favori${n > 1 ? "s" : ""}` : "Favoris";
+  $("results-caption").textContent = "Meilleur panier avec tes réglages, même au-dessus du budget";
+  $("results").innerHTML = n
+    ? deals.map((b, k) => dealCard(b, k, { favorites: true })).join("") + others.join("")
+    : `<li class="empty">${ICONS.fav}<h3>Aucun favori</h3>
+       <p>Touche l'étoile d'une offre, ou cherche un restaurant ci-dessous.</p></li>`;
+}
+
+/** Liste des restaurants qui correspondent à la recherche d'un favori. */
+function renderMatches() {
+  const norm = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const q = norm($("fav-search").value.trim());
+  if (!q) {
+    $("fav-matches").innerHTML = "";
+    return;
+  }
+  const found = [...index.values()].filter((s) => !isFav(s.uuid) && norm(s.title).includes(q))
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
+  $("fav-matches").innerHTML = found.length
+    ? found.map((s) => `
+      <li><span class="match-name">${esc(s.title)}${s.rating ? `<span class="match-meta">${ICONS.star}${s.rating.toFixed(1).replace(".", ",")}</span>` : ""}</span>
+          <button type="button" data-uuid="${esc(s.uuid)}">Ajouter</button></li>`).join("")
+    : "<li class=\"match-none\">Aucun restaurant de ce nom aujourd'hui.</li>";
+}
+
+function favButton(uuid) {
+  const fromConfig = configFavs().has(uuid), on = isFav(uuid);
+  const label = fromConfig ? "Favori de config.yaml" : on ? "Retirer des favoris" : "Ajouter aux favoris";
+  return `<button type="button" class="fav-btn" data-uuid="${esc(uuid)}" aria-pressed="${on}"
+    aria-label="${label}" title="${label}"${fromConfig ? " disabled" : ""}>${ICONS.fav}</button>`;
+}
+
+function storeMeta(s) {
+  const meta = [];
+  if (s.rating) meta.push(`${ICONS.star}${s.rating.toFixed(1).replace(".", ",")}${s.rating_count ? ` (${count.format(s.rating_count)})` : ""}`);
+  if (s.eta_min) meta.push(s.eta_min === s.eta_max || !s.eta_max ? `${s.eta_min} min` : `${s.eta_min}–${s.eta_max} min`);
+  return meta;
+}
+
+/** Favori sans panier à afficher (fermé, menu non analysé, absent du jour). */
+function infoCard(s, reason) {
+  const meta = storeMeta(s);
+  return `
+  <li class="deal deal-muted">
+    <div class="deal-head">
+      <div>
+        <h3 class="deal-name">${esc(s.title)}</h3>
+        ${meta.length ? `<p class="deal-meta">${meta.join(" · ")}</p>` : ""}
+        ${configFavs().has(s.uuid) ? '<p class="deal-tag">Suivi chaque jour</p>' : ""}
+      </div>
+      ${favButton(s.uuid)}
+    </div>
+    <p class="deal-reason">${esc(reason)}</p>
+    ${s.url ? `<a class="order secondary" href="${esc(s.url)}" target="_blank" rel="noopener">Voir sur Uber Eats ${ICONS.arrow}</a>` : ""}
+  </li>`;
 }
 
 function esc(s) {
@@ -174,11 +318,10 @@ function availabilityLabel(text) {
   return text;
 }
 
-function dealCard(b, k) {
+function dealCard(b, k, { favorites = false } = {}) {
   const s = b.store;
-  const meta = [];
-  if (s.rating) meta.push(`${ICONS.star}${s.rating.toFixed(1).replace(".", ",")}${s.rating_count ? ` (${count.format(s.rating_count)})` : ""}`);
-  if (s.eta_min) meta.push(s.eta_min === s.eta_max || !s.eta_max ? `${s.eta_min} min` : `${s.eta_min}–${s.eta_max} min`);
+  const meta = storeMeta(s);
+  const over = favorites && b.per_person >= prefs.budget;
 
   const lines = b.lines.map(([it, q]) => `
     <li><span><span class="qty">${q} ×</span>${esc(it.title)}</span>
@@ -193,11 +336,16 @@ function dealCard(b, k) {
   <li class="deal" style="--k:${k}">
     <div class="deal-head">
       <div>
-        <h3 class="deal-name"><span class="deal-rank">${k + 1}</span>${esc(s.title)}</h3>
+        <h3 class="deal-name">${favorites ? "" : `<span class="deal-rank">${k + 1}</span>`}${esc(s.title)}</h3>
         ${meta.length ? `<p class="deal-meta">${meta.join(" · ")}</p>` : ""}
         ${b.availability ? `<p class="deal-when">${esc(availabilityLabel(b.availability))}</p>` : ""}
+        ${favorites && configFavs().has(s.uuid) ? '<p class="deal-tag">Suivi chaque jour</p>' : ""}
       </div>
-      <div class="deal-price"><strong>${euro.format(b.per_person)}</strong><span>par personne</span></div>
+      <div class="deal-side">
+        ${favButton(s.uuid)}
+        <div class="deal-price${over ? " over" : ""}"><strong>${euro.format(b.per_person)}</strong>
+          <span>${over ? `au-dessus de ${euroShort.format(prefs.budget)}` : "par personne"}</span></div>
+      </div>
     </div>
     <ul class="lines">${lines}</ul>
     ${promo.length ? `<ul class="pills">${promo.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
@@ -271,6 +419,9 @@ async function load() {
     $("subtitle").textContent = "Hors connexion";
     return;
   }
+  index = new Map();
+  for (const s of data.catalog || []) index.set(s.uuid, s);
+  for (const s of data.stores) index.set(s.uuid, s); // avec menu : remplace la version légère
   describeFetch();
   if (!$("types").children.length) setupControls();
   syncControls();

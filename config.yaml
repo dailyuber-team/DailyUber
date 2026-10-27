@@ -81,5 +81,12 @@ scoring:
   w_rating: 0.25
   w_eta: 0.15
 
+# Restaurants favoris : toujours analysés, même hors des `max_stores` retenus ou absents du
+# flux du jour, et affichés dans l'onglet Favoris de l'appli. Un lien Uber Eats du restaurant
+# (…/store/<nom>/<identifiant>) ou son UUID. Les étoiles mises dans l'appli restent sur le
+# téléphone : pour qu'un favori soit vérifié chaque jour, il faut aussi l'ajouter ici.
+favorites: []
+#  - https://www.ubereats.com/fr/store/pekyo/o1RM0wMxRn6Xy4keWIR-AA
+
 storage:
   data_dir: data

@@ -1,5 +1,7 @@
 """Conversion des réponses JSON brutes d'Uber Eats en objets du modèle."""
+import base64
 import re
+import uuid as uuid_mod
 
 from .fetcher import BASE_URL
 from .hours import parse_delivery_slots, parse_hours
@@ -70,6 +72,39 @@ def parse_feed_store(raw: dict) -> Store:
         free_delivery_min=free_delivery_min,
         signposts=signposts,
         threshold_promos=parse_threshold_promos(signposts),
+    )
+
+
+def store_uuid_from_ref(ref: str) -> str:
+    """UUID d'un restaurant à partir de son lien Uber Eats (…/store/<slug>/<id base64>) ou de l'UUID lui-même."""
+    ref = ref.strip()
+    try:
+        return str(uuid_mod.UUID(ref))
+    except ValueError:
+        pass
+    m = re.search(r"/store/[^/]+/([A-Za-z0-9_-]{22})", ref)
+    if not m:
+        raise ValueError(f"Ni un lien de restaurant Uber Eats, ni un UUID : {ref!r}")
+    return str(uuid_mod.UUID(bytes=base64.urlsafe_b64decode(m[1] + "==")))
+
+
+def store_url(slug: str, store_uuid: str) -> str:
+    sid = base64.urlsafe_b64encode(uuid_mod.UUID(store_uuid).bytes).decode().rstrip("=")
+    return f"{BASE_URL}/fr/store/{slug}/{sid}"
+
+
+def parse_store_only(raw: dict) -> Store:
+    """Store construit depuis getStoreV1 seul, pour un favori absent du flux du jour
+    (pas de promo du flux ni de frais de livraison affichés : valeurs par défaut)."""
+    nums = [int(x) for x in re.findall(r"\d+", (raw.get("etaRange") or {}).get("text", ""))]
+    stats = (raw.get("storeInfoMetadata") or {}).get("rawRatingStats") or {}
+    return Store(
+        uuid=raw["uuid"],
+        title=raw.get("title") or "?",
+        url=store_url(raw["slug"], raw["uuid"]) if raw.get("slug") else BASE_URL,
+        rating_count=int(re.sub(r"\D", "", str(stats.get("ratingCount") or "")) or 0),
+        eta_min=nums[0] if nums else None,
+        eta_max=nums[-1] if nums else None,
     )
 
 

@@ -52,7 +52,9 @@
 
 **Validé quand** : un run à 22h et un run planifié pour le lendemain midi donnent des listes cohérentes avec le site.
 
-## Phase 3 — Interface graphique (PC)
+## Phase 3 — Interface graphique ✅ autrement (27/10/2026, emmagmzc)
+> Fait sous forme d'**appli web statique (PWA)** plutôt qu'avec FastAPI : la recherche tourne sur GitHub Actions, `data.json` est publié sur GitHub Pages et le calcul se fait dans le navigateur (`web/engine.js`). Le plan d'origine ci-dessous est gardé pour mémoire.
+
 - Backend **FastAPI** : `POST /api/refresh` (lance la récupération et renvoie la progression), `GET /api/deals?people=4&when=now`, `GET/POST/DELETE /api/favorites`, `GET/PUT /api/settings`.
 - Interface **une seule page**, épurée :
   - **En-tête** : zone (résumé), sélecteur de personnes **1 à 6**, « maintenant / à HH:MM », bouton **Actualiser** avec barre de progression (la récupération dure plusieurs minutes).
@@ -71,7 +73,9 @@
 
 **Validé quand** : un rayon de 1 km donne moins de restaurants qu'un rayon de 3 km, et tous sont bien dans le cercle sur la carte.
 
-## Phase 5 — Favoris
+## Phase 5 — Favoris ✅ (27/10/2026)
+> Fait : `favorites` dans config.yaml (toujours récupérés, même hors flux) ; dans l'appli, étoile sur chaque offre, onglet Favoris (meilleur panier même au-dessus du budget, ou raison de l'absence) et recherche par nom. Détails dans CONTEXT.md. Plan d'origine :
+
 - Fichier `data/favorites.json` (uuid, nom, URL). Ajout via une ★ sur une carte de résultat ou en collant l'URL Uber Eats d'un restaurant (l'uuid est extrait de l'URL).
 - Les favoris sont **toujours analysés** : ils passent outre le pré-filtre et ne comptent pas dans `max_stores`.
 - Dans l'interface, une section **« Mes favoris »** en tête, qui affiche toujours la meilleure offre de chaque favori, même au-dessus de 10 €/pers (dans ce cas en grisé, avec le prix) ; ou bien un bonus de score. **À trancher avec l'utilisateur.**
@@ -86,14 +90,15 @@
 - Données utilisateur (favoris, zones, réglages, cache) dans `%APPDATA%\DailyUber`, pour que la mise à jour de l'appli ne les efface pas.
 - Distribution : zip sur GitHub Releases.
 
-**6b. Téléphone**, par ordre de simplicité :
+**6b. Téléphone** ✅ (27/10/2026, emmagmzc) : fait avec l'option 3 ci-dessous (recherche quotidienne sur GitHub Actions, appli sur GitHub Pages), sans PC allumé. Options envisagées, par ordre de simplicité :
 1. **Réseau local** : le PC sert l'interface sur le Wi-Fi, et le téléphone l'ouvre en scannant un QR code affiché par l'appli. Interface installable comme **PWA** (icône sur l'écran d'accueil).
 2. **Hors de la maison** : Tailscale (VPN perso gratuit) entre le téléphone et le PC.
 3. **Sans PC allumé** : snapshot quotidien publié (GitHub Actions → GitHub Pages en JSON) et lu par la PWA. Risque de blocage des IP GitHub, à tester.
 
 **Validé quand** : 6a, l'appli tourne sur un autre PC Windows sans Python installé ; 6b, l'interface s'utilise depuis le téléphone.
 
-## Phase 7 — Notifications quotidiennes (demande initiale, reportée)
+## Phase 7 — Notifications quotidiennes (demande initiale, en partie faite)
+> La recherche quotidienne existe (GitHub Actions vers 10 h, Paris). Reste le message Discord.
 - Webhook Discord : embeds (restaurant, panier, prix, promo, note, délai, lien), alerte en cas d'échec, mention « 🆕 » via `history.json`.
 - Planification à 11h00, heure de Paris : Planificateur de tâches Windows (si le PC est allumé) ou GitHub Actions (crons `0 9 * * *` et `0 10 * * *`, avec un test « est-il 11h à Paris ? » dans le script). Le nombre de personnes et la zone du message viennent des réglages enregistrés.
 - README : installation, configuration, déploiement.
@@ -101,8 +106,8 @@
 ---
 
 ## Questions ouvertes pour l'utilisateur
-1. **Favoris au-dessus de 10 €/pers** : les afficher quand même (en grisé), ou seulement les remonter quand ils passent sous le seuil ?
+1. ~~**Favoris au-dessus de 10 €/pers**~~ : tranché le 27/10, ils sont affichés quand même, prix grisé « au-dessus de X € ».
 2. **Zone** : un cercle (centre + rayon) suffit-il, ou faut-il pouvoir dessiner une zone libre ?
-3. **Téléphone** : l'usage hors de chez toi est-il nécessaire (→ Tailscale ou snapshot), ou le Wi-Fi de la maison suffit-il ?
+3. ~~**Téléphone hors de chez toi**~~ : réglé par GitHub Pages (accessible partout).
 4. **Discord quotidien** : toujours souhaité une fois l'interface disponible ?
 5. **Calibrage des frais** : peux-tu fournir le détail d'une vraie commande (frais de service, livraison) pour remplacer l'estimation à 10 % ?

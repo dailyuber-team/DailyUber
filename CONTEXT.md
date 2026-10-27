@@ -59,9 +59,9 @@ Un outil perso qui parcourt les offres Uber Eats livrables autour d'Aix-en-Prove
     - un commerce peut arrêter ses livraisons avant de fermer (Carrefour : ouvert jusqu'à 20h30, livraisons jusqu'à 20h).
 - ⚠️ **Pas encore vérifié** : le comportement **le soir et la nuit**. Le flux liste-t-il les restaurants fermés ? Le pré-filtre gaspille-t-il des requêtes sur des restaurants fermés ? `isOpen` et les créneaux du jour sont-ils corrects ? Le navigateur intégré a refusé d'ouvrir ubereats.com le 22/10 : la comparaison visuelle avec le site n'a donc pas été faite.
 
-## 4. État actuel du code (roadmap : phases 0, 1 et 2 faites ; phase 2 à revérifier le soir)
+## 4. État actuel du code (27/10/2026 : moteur, horaires, appli mobile et favoris faits ; phase 2 à revérifier le soir)
 
-Dépôt GitHub privé : https://github.com/dailyuber-team/DailyUber (branche `main`), dans l'organisation `dailyuber-team` (propriétaire : Anatole-1 ; collaboratrice emmagmzc, admin du dépôt). L'ancienne adresse `Anatole-1/DailyUber` n'est qu'une redirection : **ne jamais la « supprimer »**, ça viserait le vrai dépôt. Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
+Dépôt GitHub **public** (rendu public par emmagmzc le 27/10 pour GitHub Pages) : https://github.com/dailyuber-team/DailyUber (branche `main`), dans l'organisation `dailyuber-team` (propriétaire : Anatole-1 ; collaboratrice emmagmzc, admin du dépôt). L'ancienne adresse `Anatole-1/DailyUber` n'est qu'une redirection : **ne jamais la « supprimer »**, ça viserait le vrai dépôt. Le CLI GitHub `gh` est installé (`C:\Program Files\GitHub CLI\gh.exe`, absent du PATH du shell bash) et connecté au compte Anatole-1.
 
 ```
 DailyUber/
@@ -79,18 +79,32 @@ DailyUber/
     history.py           # data/history.json : restaurants nouveaux dans le top par rapport au run précédent
     report.py            # rendu console
     main.py              # CLI
+    export.py            # data.json de l'appli : restaurants avec menu, catalogue léger, favoris
+  web/                   # appli mobile (PWA) : index.html, app.js, engine.js, style.css, sw.js, manifest, icônes
+  .github/workflows/site.yml  # recherche quotidienne vers 10 h + publication GitHub Pages
+  package.json           # "type": "module" pour Node (voir plus bas)
   tests/test_selection.py  # frais, 1+1, promos, classification, algorithme vs recherche exhaustive, doublons
   tests/test_hours.py      # plages de jours, passage de minuit, disponibilité maintenant / créneau / horaires
+  tests/test_favorites.py  # favoris toujours récupérés, favori hors flux, cache, export
+  tests/test_parity.py     # mêmes offres en Python et en JavaScript (Node.js requis)
   data/raw/latest.json.gz  # dernière récupération brute (cache, permet --offline)
 ```
 
-**Appli mobile (branche `app-mobile`)** : PWA statique dans `web/` (index.html, style.css, app.js, engine.js, sw.js, manifest, icônes), publiée sur GitHub Pages par `.github/workflows/site.yml`.
+**Appli mobile** (par emmagmzc, 27/10) : PWA statique dans `web/` (index.html, style.css, app.js, engine.js, sw.js, manifest, icônes), publiée sur GitHub Pages par `.github/workflows/site.yml`.
 - Chaque jour vers 10 h (Paris), GitHub Actions lance la recherche (`python -m dailyuber.export --refresh`), garde la récupération brute dans le cache d'Actions, et publie `data.json` (plats principaux seulement, types de repas précalculés, frais, promos, horaires).
 - Le téléphone recalcule les offres en JavaScript (`web/engine.js`, portage fidèle de `selection.py` et `hours.availability`, y compris l'arrondi de Python) : personnes 1 à 6, heure (maintenant / aujourd'hui / demain), budget, Uber One, types de repas. **Toute modification de selection.py ou hours.py doit être reportée dans engine.js** ; `tests/test_parity.py` (Node.js requis) compare les deux sur des données aléatoires et sur la dernière récupération réelle.
 - Types de repas : `meal_types` dans config.yaml (mots-clés du plat, sinon `cuisineList` du restaurant) ; CLI `--type` et `--budget`.
-- Choix de l'utilisatrice : dépôt public + GitHub Pages, noir et blanc, thème clair/sombre selon le téléphone. Risque à surveiller : Uber peut bloquer les adresses IP de GitHub.
+- Choix de l'utilisatrice : dépôt public + GitHub Pages, noir et blanc, thème clair/sombre selon le téléphone. Risque à surveiller : Uber peut bloquer les adresses IP de GitHub (pas le cas au 27/10 : 260 restaurants et 40 menus récupérés depuis GitHub Actions).
+- `data.json` (`FORMAT_VERSION = 2`) : `stores` (avec menu), `catalog` (tous les autres restaurants du flux, sans menu : nom, lien, note, délai) et `favorites` (UUID des favoris de config.yaml).
+- ⚠️ **Node et `package.json`** : un `C:\Users\anato\package.json` (sans rapport avec le projet) déclare `"type": "commonjs"`, ce qui faisait échouer `tests/test_parity.py` en local. Le `package.json` du projet déclare `"type": "module"` pour s'en affranchir : ne pas le supprimer.
 
-**Lancer** (52 tests : `.venv\Scripts\python -m pytest -q`) :
+**Favoris** (27/10) :
+- `favorites` dans config.yaml : liens Uber Eats (`…/store/<nom>/<id base64>`) ou UUID (`parser.store_uuid_from_ref`). Ces restaurants sont **toujours récupérés**, en plus des `max_stores` du pré-filtre, même absents du flux du jour (`getStoreV1` par UUID ; le Store est alors reconstruit par `parser.parse_store_only`). Le cache est périmé si la liste des favoris change.
+- Appli : étoile sur chaque offre, onglet **Offres | Favoris (n)**, recherche par nom dans `stores` + `catalog`. Les étoiles sont mémorisées sur le téléphone (`localStorage` `dailyuber:favorites`) ; ceux de config.yaml sont marqués « Suivi chaque jour » et ne se retirent pas depuis l'appli.
+- Onglet Favoris : meilleur panier de chaque favori avec les réglages du moment (personnes, heure, Uber One), **tous types de plats et même au-dessus du budget** (prix grisé « au-dessus de X € »). Sinon une carte explique pourquoi : fermé / pas de livraison à cette heure, menu pas analysé aujourd'hui (favori seulement sur le téléphone → l'ajouter à config.yaml), absent de la recherche du jour.
+- Pas de changement dans `engine.js` : l'onglet réutilise `bestBaskets` et `availability`, la parité Python/JS n'est pas touchée.
+
+**Lancer** (68 tests : `.venv\Scripts\python -m pytest -q`) :
 - `.venv\Scripts\python -m dailyuber.main` : utilise le cache s'il a moins de 30 min, sinon récupère (environ 3 min pour 40 menus).
 - `--refresh` : force une nouvelle récupération ; `--offline` : utilise le cache quel que soit son âge.
 - `--people 1 3 6` : nombre(s) de personnes.
@@ -131,9 +145,9 @@ DailyUber/
 
 ## 6. Nouvelles demandes (voir ROADMAP.md pour l'avancement)
 
-1. Interface graphique simple et épurée.
-2. Nombre de personnes réglable de 1 à 6. ✅ (moteur et CLI ; reste l'interface)
-3. Enseignes favorites : toujours analysées et affichées en priorité.
-4. Application portable : PC d'abord, téléphone ensuite.
+1. Interface graphique simple et épurée. ✅ (appli mobile PWA d'emmagmzc, utilisable aussi sur PC dans le navigateur)
+2. Nombre de personnes réglable de 1 à 6. ✅
+3. Enseignes favorites : toujours analysées et affichées dans un onglet. ✅
+4. Application portable : PC d'abord, téléphone ensuite. ✅ côté téléphone (PWA sur GitHub Pages) ; pas d'exécutable PC autonome.
 5. Choix d'une zone géographique dans laquelle les offres sont cherchées.
 6. Vérification fiable des horaires de commande et de l'ouverture des restaurants. ✅ (à revérifier le soir)

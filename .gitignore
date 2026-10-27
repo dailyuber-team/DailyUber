@@ -5,3 +5,4 @@ __pycache__/
 data/
 _site/
 web/data.json
+.claude/

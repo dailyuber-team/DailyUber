@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .models import Basket, Store
-from .parser import parse_feed_store, parse_store_details
+from .parser import parse_feed_store, parse_store_details, parse_store_only, store_uuid_from_ref
 from .selection import select_deals
 
 log = logging.getLogger(__name__)
@@ -32,24 +32,46 @@ def prefilter(stores: list[Store], cfg: dict) -> list[Store]:
     return kept[: cfg["fetch"]["max_stores"]]
 
 
+def favorite_uuids(cfg: dict) -> list[str]:
+    """UUID des favoris de config.yaml (liens Uber Eats ou UUID), sans doublon ; un lien illisible est ignoré."""
+    out = []
+    for ref in cfg.get("favorites") or []:
+        try:
+            u = store_uuid_from_ref(str(ref))
+        except ValueError as e:
+            log.warning("Favori ignoré : %s", e)
+            continue
+        if u not in out:
+            out.append(u)
+    return out
+
+
 def fetch_raw(cfg: dict, progress=None) -> dict:
-    """Récupère flux + menus. `progress(done, total, label)` est appelé après chaque menu."""
+    """Récupère flux + menus. `progress(done, total, label)` est appelé après chaque menu.
+
+    Les favoris de config.yaml sont toujours récupérés, en plus des `max_stores` retenus par
+    le pré-filtre, et même s'ils ne sont pas dans le flux du jour (le menu se demande par UUID).
+    """
     from .fetcher import UberEatsSession  # import tardif : le mode cache ne nécessite pas Playwright
 
+    favorites = favorite_uuids(cfg)
     raw = {"fetched_at": datetime.now().isoformat(timespec="seconds"),
-           "address": cfg["address"], "feed": [], "stores": {}}
+           "address": cfg["address"], "favorites": favorites, "feed": [], "stores": {}}
     with UberEatsSession(cfg) as session:
         raw["feed"] = session.fetch_feed()
-        targets = prefilter([parse_feed_store(s) for s in raw["feed"]], cfg)
-        log.info("%d restaurants retenus pour récupérer le menu", len(targets))
-        for i, s in enumerate(targets, 1):
+        feed = [parse_feed_store(s) for s in raw["feed"]]
+        names = {s.uuid: s.title for s in feed}
+        targets = [(s.uuid, s.title) for s in prefilter([s for s in feed if s.uuid not in favorites], cfg)]
+        targets += [(u, names.get(u, f"favori {u[:8]}… (absent du flux)")) for u in favorites]
+        log.info("%d restaurants retenus pour récupérer le menu, dont %d favoris", len(targets), len(favorites))
+        for i, (uuid, title) in enumerate(targets, 1):
             try:
-                raw["stores"][s.uuid] = session.fetch_store(s.uuid)
-                log.info("[%d/%d] %s", i, len(targets), s.title)
+                raw["stores"][uuid] = session.fetch_store(uuid)
+                log.info("[%d/%d] %s", i, len(targets), title)
             except Exception as e:  # un menu en échec ne doit pas faire tomber le run
-                log.warning("[%d/%d] %s : échec (%s)", i, len(targets), s.title, e)
+                log.warning("[%d/%d] %s : échec (%s)", i, len(targets), title, e)
             if progress:
-                progress(i, len(targets), s.title)
+                progress(i, len(targets), title)
     if not raw["stores"]:
         raise RuntimeError("Aucun menu récupéré")
     path = _raw_path(cfg)
@@ -74,6 +96,9 @@ def load_cached_raw(cfg: dict, max_age_min: float | None = None) -> dict | None:
 def get_raw(cfg: dict, refresh: bool = False, progress=None) -> dict:
     if not refresh:
         raw = load_cached_raw(cfg, cfg["fetch"]["cache_max_age_min"])
+        if raw and raw.get("favorites", []) != favorite_uuids(cfg):
+            log.info("Favoris modifiés depuis la dernière récupération : nouvelle récupération")
+            raw = None
         if raw:
             log.info("Données en cache du %s", raw.get("fetched_at", "?"))
             return raw
@@ -81,8 +106,16 @@ def get_raw(cfg: dict, refresh: bool = False, progress=None) -> dict:
 
 
 def build_stores(raw: dict) -> list[Store]:
+    """Restaurants dont le menu a été récupéré. Un favori absent du flux est reconstruit
+    à partir de son seul menu (getStoreV1)."""
     feed = {s.uuid: s for s in (parse_feed_store(r) for r in raw["feed"])}
-    return [parse_store_details(feed[uuid], data) for uuid, data in raw["stores"].items() if uuid in feed]
+    return [parse_store_details(feed[uuid] if uuid in feed else parse_store_only(data), data)
+            for uuid, data in raw["stores"].items()]
+
+
+def build_catalog(raw: dict) -> list[Store]:
+    """Tous les restaurants du flux (sans menu) : de quoi chercher un favori dans l'appli."""
+    return [parse_feed_store(r) for r in raw["feed"]]
 
 
 def with_uber_one(cfg: dict, enabled: bool | None) -> dict:

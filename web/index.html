@@ -29,6 +29,8 @@
 
     <p class="banner" id="banner" hidden></p>
 
+    <div class="segmented tabs" id="tab" role="radiogroup" aria-label="Affichage"></div>
+
     <section class="group" aria-label="Réglages">
       <div class="row">
         <span class="row-label" id="people-label">Personnes</span>
@@ -62,14 +64,24 @@
       </div>
     </section>
 
-    <h2 class="section-title">Type de repas</h2>
-    <div class="chips" id="types" role="group" aria-label="Type de repas"></div>
+    <section id="types-section">
+      <h2 class="section-title">Type de repas</h2>
+      <div class="chips" id="types" role="group" aria-label="Type de repas"></div>
+    </section>
 
     <div class="results-head">
       <h2 class="section-title" id="results-title" aria-live="polite">Offres</h2>
-      <span class="results-caption">Classées par prix, note et rapidité</span>
+      <span class="results-caption" id="results-caption">Classées par prix, note et rapidité</span>
     </div>
     <ol class="results" id="results"></ol>
+
+    <section class="fav-add" id="fav-add" hidden>
+      <h2 class="section-title">Ajouter un favori</h2>
+      <input class="search" type="search" id="fav-search" placeholder="Nom du restaurant" autocomplete="off"
+             aria-describedby="fav-add-caption">
+      <p class="results-caption" id="fav-add-caption">Parmi les restaurants qui livrent aujourd'hui à cette adresse.</p>
+      <ul class="matches" id="fav-matches"></ul>
+    </section>
 
     <footer class="footer">
       <p>Prix estimés : Uber Eats n'affiche les frais de service exacts qu'au paiement. Un prix « dès » peut augmenter selon les options choisies.</p>
