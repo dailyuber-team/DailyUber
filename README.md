@@ -8,7 +8,7 @@ L'outil parcourt les restaurants livrables, lit leurs menus et leurs promos (1 a
 
 L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fois GitHub Pages activé, voir plus bas). Elle n'a pas besoin d'un PC allumé :
 
-- chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul et publie les offres ;
+- chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul, sur **tous** les restaurants bien notés (environ 200, un quart d'heure de recherche), et publie les offres ;
 - dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
 - le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats ;
 - l'onglet **Favoris** montre directement tes restaurants préférés (voir plus bas).
@@ -89,7 +89,7 @@ La première recherche prend environ 3 minutes. Les données sont ensuite gardé
 | `--at HH:MM` | Heure de livraison visée : aujourd'hui, ou demain si l'heure est passée (par défaut : maintenant) |
 | `--on JOUR` | Jour visé avec `--at` : `demain` ou une date `AAAA-MM-JJ` |
 | `--uber-one` / `--no-uber-one` | Calcule les prix avec ou sans l'abonnement Uber One |
-| `--type TYPE …` | Seulement certains types de repas : `burger`, `pizza`, `sushi`, `asiatique`, `poke`, `tacos_kebab`, `sandwich`, `salade`, `pates`, `poulet` |
+| `--type TYPE …` | Seulement certains types de repas : `burger`, `crousty`, `pizza`, `sushi`, `asiatique`, `poke`, `tacos_kebab`, `sandwich`, `salade`, `pates`, `poulet` |
 | `--budget EUR` | Prix max par personne (par défaut : 10 €) |
 | `--refresh` | Force une nouvelle récupération, même si le cache est récent |
 | `--offline` | Réutilise les dernières données, même si elles sont anciennes |
@@ -108,7 +108,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `meal` | Ce qui compte comme un « plat » (prix minimum, mots-clés) |
 | `meal_types` | Les types de repas proposés et leurs mots-clés |
 | `scoring` | Poids du prix, de la note et du délai dans le classement |
-| `fetch` | Nombre de restaurants analysés, délai entre les requêtes, durée du cache |
+| `fetch` | Nombre de restaurants analysés (40 sur le PC ; `0` = tous), délai entre les requêtes, durée du cache |
 | `favorites` | Restaurants toujours analysés et affichés dans l'onglet Favoris (liens Uber Eats) |
 
 ## Tests

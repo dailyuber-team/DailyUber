@@ -29,7 +29,7 @@ def prefilter(stores: list[Store], cfg: dict) -> list[Store]:
             and (s.eta_max is None or s.eta_max <= p["max_eta_min"])]
     # Les restaurants avec une promo affichée passent en premier, puis par note.
     kept.sort(key=lambda s: (not s.signposts, -(s.rating or 0)))
-    return kept[: cfg["fetch"]["max_stores"]]
+    return kept[: cfg["fetch"]["max_stores"] or None]  # 0 = tous
 
 
 def favorite_uuids(cfg: dict) -> list[str]:

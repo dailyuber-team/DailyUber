@@ -19,9 +19,13 @@ class MealClassifier:
         self.min_price = meal_cfg["min_item_price"]
         self.main = _kw_regex(meal_cfg["main_keywords"])
         self.exclude = _kw_regex(meal_cfg["exclude_keywords"])
+        always = meal_cfg.get("always_exclude_keywords") or []
+        self.always_exclude = _kw_regex(always) if always else None
 
     def is_main(self, item: Item) -> bool:
         if item.price < self.min_price:
+            return False
+        if self.always_exclude and self.always_exclude.search(item.title):
             return False
         title_main = bool(self.main.search(item.title))
         section_main = bool(self.main.search(item.section))
@@ -39,7 +43,8 @@ def _norm(text: str) -> str:
 
 
 class MealTypes:
-    """Types de repas d'un plat : mots-clés du titre ou de la section, sinon cuisines du restaurant."""
+    """Types de repas d'un plat : mots-clés du titre ou de la section, sinon ceux du restaurant
+    (mots-clés dans son nom, ou sa liste de cuisines)."""
 
     def __init__(self, types_cfg: dict):
         self.keywords = {t: _kw_regex(c["keywords"]) for t, c in types_cfg.items()}
@@ -51,7 +56,7 @@ class MealTypes:
         if found:
             return found
         cuisines = {_norm(c) for c in store.cuisines}
-        return [t for t, cs in self.cuisines.items() if cs & cuisines]
+        return [t for t, cs in self.cuisines.items() if cs & cuisines or self.keywords[t].search(store.title)]
 
 
 def item_cost(item: Item, qty: int) -> tuple[float, int]:

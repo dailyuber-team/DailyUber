@@ -10,7 +10,8 @@ address:
 
 fetch:
   max_feed_pages: 3          # ~80-100 restaurants par page
-  max_stores: 40             # nombre max de menus récupérés (1 requête chacun)
+  max_stores: 40             # nombre max de menus récupérés (1 requête chacun) ; 0 = tous
+                             # (GitHub Actions les récupère tous : --max-stores 0)
   min_delay_s: 2.0           # délai aléatoire entre deux requêtes
   max_delay_s: 5.0
   headless: true
@@ -47,12 +48,15 @@ meal:
   exclude_keywords: [boisson, drink, soda, coca, eau, bière, vin, dessert, glace, sauce,
                      accompagnement, frite, side, supplément, extra, entrée, snack, enfant,
                      kid, cookie, brownie, tiramisu, verrine, dip, nugget]
+  # Exclus même si le titre contient un mot-clé "main" (ex. "Crousty Nutella Banane", un dessert).
+  always_exclude_keywords: [nutella, chocolat, speculoos, oreo, kinder]
 
 # Types de repas (filtre de l'appli et --type). Un plat est d'un type si son titre ou sa
 # section contient un des mots-clés ; sinon il prend les types du restaurant, d'après
-# sa liste de cuisines Uber Eats ("Italienne", "Sushis"...).
+# son nom ("Tasty Crousty") et sa liste de cuisines Uber Eats ("Italienne", "Sushis"...).
 meal_types:
   burger:      {label: "Burger", keywords: [burger, smash, cheeseburger], cuisines: [burgers]}
+  crousty:     {label: "Crousty", keywords: [crousty], cuisines: []}
   pizza:       {label: "Pizza", keywords: [pizza, margherita, calzone], cuisines: [pizzas]}
   sushi:       {label: "Sushi & japonais", keywords: [sushi, maki, california, sashimi, chirashi, gunkan,
                                                      nigiri, temaki, ramen, donburi, yakitori], cuisines: [japonaise, sushis]}

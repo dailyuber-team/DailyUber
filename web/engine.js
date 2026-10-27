@@ -11,6 +11,16 @@ const NOW_MARGIN_MIN = 30; // une heure visée à moins de 30 min est traitée c
 // (Math.round et toFixed arrondissent autrement, ce qui décalerait des centimes.)
 export function pyRound(x, n = 0) {
   if (x === 0 || !Number.isFinite(x)) return x;
+  // Cas courant, rapide : loin d'une égalité (…,5), l'erreur du produit (< 1e-9 ici) ne peut
+  // pas changer le côté de l'arrondi, et k / 10^n donne le même double que Python.
+  const p = 10 ** n, y = Math.abs(x) * p;
+  if (y < 1e9) {
+    const f = y - Math.floor(y);
+    if (Math.abs(f - 0.5) > 1e-7) {
+      const r = (f < 0.5 ? Math.floor(y) : Math.floor(y) + 1) / p;
+      return x < 0 ? -r : r;
+    }
+  }
   const [int, frac] = Math.abs(x).toFixed(100).split("."); // décimales exactes du double
   const kept = int + frac.slice(0, n);
   const rest = frac.slice(n);
@@ -155,13 +165,19 @@ function unitLowerBound(it) {
   return it.bogo_get && it.bogo_buy ? it.price * it.bogo_buy / (it.bogo_buy + it.bogo_get) : it.price;
 }
 
-/** Combinaison de `n` unités au sous-total minimal (en centimes), sous-total >= floorCents. */
-function minSubtotalLines(items, n, floorCents, minDistinct) {
+/** Bornes et coûts en centimes des plats candidats, communs à tous les seuils d'un panier. */
+function centsTables(items, n) {
   const m = items.length;
   const lb = items.map((it) => pyRound(unitLowerBound(it) * 100));
   const suffixMax = new Array(m + 1).fill(0);
   for (let i = m - 1; i >= 0; i--) suffixMax[i] = Math.max(pyRound(items[i].price * 100), suffixMax[i + 1]);
   const cost = items.map((it) => Array.from({ length: n + 1 }, (_, q) => pyRound(itemCost(it, q)[0] * 100)));
+  return { lb, suffixMax, cost };
+}
+
+/** Combinaison de `n` unités au sous-total minimal (en centimes), sous-total >= floorCents. */
+function minSubtotalLines(items, n, floorCents, minDistinct, { lb, suffixMax, cost }) {
+  const m = items.length;
   let bestCost = Infinity, bestChosen = null;
   const chosen = [];
 
@@ -188,8 +204,9 @@ function minSubtotalLines(items, n, floorCents, minDistinct) {
 }
 
 function bestBasket(store, people, fees, minDistinct, itemFilter) {
-  const mains = store.items.filter((it) => !itemFilter || itemFilter(it))
-    .sort((a, b) => unitLowerBound(a) - unitLowerBound(b));
+  // Tri stable une fois pour toutes : filtrer la liste triée revient à trier la liste filtrée.
+  store._byBound ??= store.items.slice().sort((a, b) => unitLowerBound(a) - unitLowerBound(b));
+  const mains = itemFilter ? store._byBound.filter(itemFilter) : store._byBound;
   minDistinct = Math.min(minDistinct, people);
   if (mains.length < minDistinct || !mains.length) return null;
   const candidates = mains.slice(0, MAX_CANDIDATES).concat(mains.slice(MAX_CANDIDATES).filter((it) => it.bogo_get));
@@ -197,9 +214,10 @@ function bestBasket(store, people, fees, minDistinct, itemFilter) {
   const floors = new Set([0, fees.small_order_threshold, ...store.threshold_promos.map((p) => p.min_subtotal)]);
   if (store.free_delivery_min != null) floors.add(store.free_delivery_min);
   if ((fees.uber_one || {}).enabled) floors.add(fees.uber_one.min_subtotal);
+  const tables = centsTables(candidates, people);
   let best = null;
   for (const floor of [...floors].sort((a, b) => a - b)) {
-    const lines = minSubtotalLines(candidates, people, pyRound(floor * 100), minDistinct);
+    const lines = minSubtotalLines(candidates, people, pyRound(floor * 100), minDistinct, tables);
     if (lines === null) continue;
     const b = buildBasket(store, people, lines, fees);
     if (best === null || b.total < best.total) best = b;

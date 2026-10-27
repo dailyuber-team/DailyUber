@@ -264,3 +264,55 @@ def test_uber_one_basket_reaches_minimum_when_cheaper():
     assert [it.title for it, _ in b.lines] == ["Menu burger"]
     assert b.total == 12.6
     assert any("Uber One" in p for p in b.promos_used)
+
+
+# --- Types de repas ---
+
+TYPES = {"burger": {"label": "Burger", "keywords": ["burger"], "cuisines": ["Burgers"]},
+         "crousty": {"label": "Crousty", "keywords": ["crousty"], "cuisines": []},
+         "pizza": {"label": "Pizza", "keywords": ["pizza"], "cuisines": ["Pizzas", "Italienne"]}}
+
+
+def test_meal_type_from_item_keywords_first():
+    from dailyuber.selection import MealTypes
+    mt = MealTypes(TYPES)
+    s = store([], title="Tasty Crousty", cuisines=["Pizzas"])
+    assert mt.of(Item("Burger crousty", 9.0), s) == ["burger", "crousty"]
+    assert mt.of(Item("Plat", 9.0, section="Nos pizzas"), s) == ["pizza"]
+
+
+def test_meal_type_falls_back_on_store_name_and_cuisines():
+    from dailyuber.selection import MealTypes
+    mt = MealTypes(TYPES)
+    assert mt.of(Item("Menu classique", 9.0), store([], title="Tasty Crousty")) == ["crousty"]
+    assert mt.of(Item("Menu du jour", 9.0), store([], cuisines=["Italienne\xa0"])) == ["pizza"]
+    assert mt.of(Item("Menu du jour", 9.0), store([])) == []
+
+
+def test_select_deals_keeps_only_wanted_meal_types():
+    cfg = {**CFG, "meal_types": TYPES}
+    s1 = store([Item("Menu burger", 6.5)], uuid="a", title="Burger House")
+    s2 = store([Item("Plat crousty", 6.8)], uuid="b", title="Tasty Crousty")
+    s3 = store([Item("Menu", 6.0)], uuid="c", title="Chez Toto")
+    now = __import__("datetime").datetime(2026, 10, 22, 12, 0, tzinfo=__import__("dailyuber.hours", fromlist=["PARIS"]).PARIS)
+    pick = lambda types: [b.store.uuid for b in select_deals([s1, s2, s3], cfg, [2], now=now, meal_types=types)[2]]
+    assert sorted(pick(None)) == ["a", "b", "c"]
+    assert pick(["crousty"]) == ["b"]
+    assert sorted(pick(["crousty", "burger"])) == ["a", "b"]
+
+
+def test_prefilter_max_stores_zero_keeps_all():
+    from dailyuber.engine import prefilter
+    stores = [store([], uuid=str(i), title=f"R{i}") for i in range(7)]
+    cfg = {"prefilter": {"min_rating": 4.0, "max_eta_min": 45}, "fetch": {"max_stores": 0}}
+    assert len(prefilter(stores, cfg)) == 7
+    cfg["fetch"]["max_stores"] = 3
+    assert len(prefilter(stores, cfg)) == 3
+
+
+def test_always_excluded_keywords_beat_main_keywords():
+    meal = {**MEAL, "main_keywords": MEAL["main_keywords"] + ["crousty"], "always_exclude_keywords": ["nutella"]}
+    c = MealClassifier(meal)
+    assert not c.is_main(Item("Crousty Nutella Banane", 6.5))
+    assert c.is_main(Item("Crousty poulet", 8.0))
+    assert MealClassifier(MEAL).is_main(Item("Menu burger frites", 9.0))  # sans la liste : inchangé

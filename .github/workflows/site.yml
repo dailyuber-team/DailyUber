@@ -27,7 +27,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45  # environ 200 menus à 2-5 s d'intervalle
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -89,7 +89,7 @@ jobs:
 
       - name: Rechercher les offres sur Uber Eats
         if: steps.plan.outputs.fetch == 'true'
-        run: python -m dailyuber.export --refresh --out _site/data.json
+        run: python -m dailyuber.export --refresh --max-stores 0 --out _site/data.json  # tous les restaurants éligibles
 
       - name: Garder la recherche pour les prochaines publications
         if: steps.plan.outputs.fetch == 'true'

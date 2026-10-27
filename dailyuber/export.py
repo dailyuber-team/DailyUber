@@ -82,10 +82,13 @@ def main() -> int:
     src.add_argument("--offline", action="store_true", help="réutilise la dernière récupération, quel que soit son âge")
     src.add_argument("--refresh", action="store_true", help="force une nouvelle récupération même si le cache est récent")
     ap.add_argument("--out", default="_site/data.json", help="fichier de sortie (défaut : _site/data.json)")
+    ap.add_argument("--max-stores", type=int, metavar="N", help="menus à récupérer, 0 = tous (défaut : config.yaml)")
     ap.add_argument("--config", help="chemin vers config.yaml")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
     cfg = load_config(args.config)
+    if args.max_stores is not None:
+        cfg["fetch"]["max_stores"] = args.max_stores
     try:
         raw = engine.load_cached_raw(cfg) if args.offline else engine.get_raw(cfg, refresh=args.refresh)
         if raw is None:
