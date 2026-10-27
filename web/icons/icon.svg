@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Icône DailyUber : "10 €" blanc sur fond noir. Fond plein bord à bord : iOS et Android arrondissent eux-mêmes. -->
-  <rect width="1024" height="1024" fill="#000"/>
-  <g fill="#fff" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" text-anchor="middle">
-    <text x="512" y="575" font-size="360" font-weight="800" letter-spacing="4">10€</text>
-    <rect x="352" y="660" width="320" height="28" rx="14" opacity="0.9"/>
-  </g>
-</svg>

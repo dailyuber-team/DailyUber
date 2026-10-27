@@ -23,6 +23,14 @@ Pour relancer une recherche tout de suite : onglet **Actions** du dépôt GitHub
 2. Activer GitHub Pages : **Settings → Pages → Source : GitHub Actions**.
 3. Lancer la première recherche : **Actions → Recherche du jour et appli → Run workflow**.
 
+### Logo et icônes
+
+Le logo est dans [design/logo.webp](design/logo.webp). Pour en changer : remplacer ce fichier, puis régénérer toutes les icônes (iPhone, Android, onglet) :
+
+```bash
+.venv\Scripts\python tools/make_icons.py
+```
+
 ### Tester l'appli sur le PC
 
 ```bash

@@ -1,6 +1,6 @@
 // Fonctionnement hors connexion : on sert toujours la version en ligne si possible,
 // sinon la dernière version gardée en cache (interface et offres du jour).
-const CACHE = "dailyuber-v2";
+const CACHE = "dailyuber-v3";
 const SHELL = ["./", "index.html", "style.css", "app.js", "engine.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/apple-touch-icon.png"];
 
