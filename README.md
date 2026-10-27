@@ -1,14 +1,17 @@
 # DailyUber
 
-Trouve les meilleurs plans Uber Eats autour d'Aix-en-Provence pour manger de 1 à 6 personnes **à moins de 10 € par personne**, frais compris.
+[![Recherche du jour](https://github.com/dailyuber-team/DailyUber/actions/workflows/site.yml/badge.svg)](https://github.com/dailyuber-team/DailyUber/actions/workflows/site.yml)
+**Appli : [dailyuber-team.github.io/DailyUber](https://dailyuber-team.github.io/DailyUber/)**
+
+Trouve les meilleurs plans Uber Eats et Deliveroo autour d'Aix-en-Provence pour manger de 1 à 6 personnes **à moins de 10 € par personne**, frais compris.
 
 L'outil parcourt les restaurants livrables sur **Uber Eats et Deliveroo**, lit leurs menus et leurs promos (1 acheté = 1 offert, -20 % dès X €…), compose le panier le moins cher, puis ajoute les frais de livraison et de service. Il affiche le top 5 des offres pour chaque taille de groupe.
 
 ## L'appli sur téléphone
 
-L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fois GitHub Pages activé, voir plus bas). Elle n'a pas besoin d'un PC allumé :
+L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/**. Elle n'a pas besoin d'un PC allumé :
 
-- chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul, sur **tous** les restaurants bien notés (environ 200, un quart d'heure de recherche), et publie les offres ;
+- chaque jour vers **10 h**, GitHub lance la recherche tout seul sur **tous** les restaurants d'Uber Eats (environ 400) et de Deliveroo (environ 80), puis publie les offres vers 11 h (la recherche dure environ 50 minutes) ;
 - dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
 - **Autour de moi** : n'affiche que les restaurants à moins de 0,5 à 5 km de ta position (le téléphone demande l'autorisation de localisation ; la position n'est pas enregistrée). La recherche, elle, est toujours faite depuis le centre d'Aix ;
 - chaque offre indique sa plateforme ; le bouton « Commander sur Uber Eats » ou « Commander sur Deliveroo » ouvre le restaurant ; le réglage **Plateforme** permet de n'en voir qu'une ;
@@ -122,10 +125,32 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `favorites` | Restaurants toujours analysés et affichés dans l'onglet Favoris (liens Uber Eats) |
 | `deliveroo` | Deliveroo activé ou non, quartier de la page de liste, heures interrogées |
 
-## Tests
+## Développement
+
+| Fichier | Rôle |
+|---|---|
+| `dailyuber/fetcher.py`, `deliveroo.py` | Récupération des données (Uber Eats via Playwright, Deliveroo par simples requêtes) |
+| `dailyuber/parser.py` | Réponses d'Uber Eats → restaurants, plats, promos, frais |
+| `dailyuber/hours.py` | Horaires, créneaux, disponibilité à une heure donnée |
+| `dailyuber/selection.py` | Panier le moins cher (calcul exact), frais, classement |
+| `dailyuber/engine.py` | Cache des données et enchaînement des étapes |
+| `dailyuber/main.py`, `export.py` | Ligne de commande et `data.json` de l'appli |
+| `web/` | Appli (PWA) ; `web/engine.js` refait le calcul de `selection.py` dans le téléphone |
+
+Tests (aucun accès réseau : `tests/conftest.py` l'interdit) :
 
 ```bash
 .venv\Scripts\python -m pytest -q
+```
+
+Vérification du style et des erreurs courantes (réglages dans `pyproject.toml`) :
+
+```bash
+.venv\Scripts\python -m pip install ruff
+```
+
+```bash
+.venv\Scripts\ruff check .
 ```
 
 L'appli refait le calcul en JavaScript ([web/engine.js](web/engine.js)) : toute modification de `selection.py` ou `hours.py` doit y être reportée. Le test `tests/test_parity.py` (il faut [Node.js](https://nodejs.org)) vérifie que les deux donnent exactement les mêmes offres.

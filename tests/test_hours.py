@@ -2,8 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from dailyuber.hours import (PARIS, availability, is_open_at, parse_day_range, parse_delivery_slots,
-                             parse_hours, resolve_target)
+from dailyuber.hours import PARIS, availability, is_open_at, parse_day_range, parse_delivery_slots, parse_hours, resolve_target
 from dailyuber.models import Store
 
 THU_1245 = datetime(2026, 10, 22, 12, 45, tzinfo=PARIS)  # jeudi

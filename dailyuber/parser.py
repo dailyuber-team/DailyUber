@@ -7,17 +7,18 @@ from .fetcher import BASE_URL
 from .hours import parse_delivery_slots, parse_hours
 from .models import Item, Store, ThresholdPromo
 
-_NUM = r"(\d+(?:[.,]\d+)?)"
-_PCT_RE = re.compile(rf"-\s*{_NUM}\s*%\s*dès\s*{_NUM}\s*€", re.I)
-_AMOUNT_RE = re.compile(rf"(?:-\s*{_NUM}\s*€|{_NUM}\s*€\s*(?:de réduction|offerts?))\s*dès\s*{_NUM}\s*€", re.I)
-_GIFT_RE = re.compile(rf"article offert dès\s*{_NUM}\s*€", re.I)
-_FARE_RE = re.compile(rf"frais de livraison\s*(?::|à)\s*{_NUM}\s*€", re.I)
-_DISCOUNTED_FROM_RE = re.compile(rf"discounted from\s*{_NUM}", re.I)
+NUM = r"(\d+(?:[.,]\d+)?)"
+_PCT_RE = re.compile(rf"-\s*{NUM}\s*%\s*dès\s*{NUM}\s*€", re.I)
+_AMOUNT_RE = re.compile(rf"(?:-\s*{NUM}\s*€|{NUM}\s*€\s*(?:de réduction|offerts?))\s*dès\s*{NUM}\s*€", re.I)
+_GIFT_RE = re.compile(rf"article offert dès\s*{NUM}\s*€", re.I)
+_FARE_RE = re.compile(rf"frais de livraison\s*(?::|à)\s*{NUM}\s*€", re.I)
+_DISCOUNTED_FROM_RE = re.compile(rf"discounted from\s*{NUM}", re.I)
 _FREE_DELIVERY_RE = re.compile(r"livraison offerte|frais de livraison\s*(?:à|:)\s*0(?:[.,]00)?\s*€", re.I)
-_CONDITION_RE = re.compile(rf"(?:supérieures? à|dès|à partir de)\s*{_NUM}\s*€", re.I)
+_CONDITION_RE = re.compile(rf"(?:supérieures? à|dès|à partir de)\s*{NUM}\s*€", re.I)
 
 
-def _num(s: str) -> float:
+def to_float(s: str) -> float:
+    """"12,50" ou "12.50" -> 12.5."""
     return float(s.replace(",", "."))
 
 
@@ -26,13 +27,13 @@ def parse_threshold_promos(texts: list[str]) -> list[ThresholdPromo]:
     for t in texts:
         t = t.strip()
         if m := _PCT_RE.search(t):
-            promos.append(ThresholdPromo(min_subtotal=_num(m[2]), pct_off=_num(m[1]) / 100, label=t))
+            promos.append(ThresholdPromo(min_subtotal=to_float(m[2]), pct_off=to_float(m[1]) / 100, label=t))
         elif m := _AMOUNT_RE.search(t):
             amount = m[1] or m[2]
-            promos.append(ThresholdPromo(min_subtotal=_num(m[3]), amount_off=_num(amount), label=t))
+            promos.append(ThresholdPromo(min_subtotal=to_float(m[3]), amount_off=to_float(amount), label=t))
         elif m := _GIFT_RE.search(t):
             # Article offert : on ne sait pas lequel, aucune remise chiffrée, juste signalé.
-            promos.append(ThresholdPromo(min_subtotal=_num(m[1]), label=t))
+            promos.append(ThresholdPromo(min_subtotal=to_float(m[1]), label=t))
     return promos
 
 
@@ -44,11 +45,11 @@ def parse_delivery_fee(texts: list[str]) -> tuple[float | None, float | None]:
             continue
         if _FREE_DELIVERY_RE.search(t):
             if m := _CONDITION_RE.search(t):
-                free_min = _num(m[1])
+                free_min = to_float(m[1])
             else:
                 fee = 0.0
         elif m := _FARE_RE.search(t):
-            fee = _num(m[1])
+            fee = to_float(m[1])
     return fee, free_min
 
 
@@ -153,7 +154,7 @@ def parse_store_details(store: Store, raw: dict) -> Store:
                     title=it["title"].strip(),
                     price=it["price"] / 100,
                     section=sec_title,
-                    original_price=_num(m[1]) if m else None,
+                    original_price=to_float(m[1]) if m else None,
                     bogo_buy=buy, bogo_get=get, bogo_max=max_,
                     has_customizations=bool(it.get("hasCustomizations")),
                 )

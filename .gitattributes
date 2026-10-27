@@ -1,0 +1,6 @@
+# Fins de ligne LF dans le dépôt et sur toutes les machines (Windows compris).
+* text=auto eol=lf
+
+*.png  binary
+*.webp binary
+*.gz   binary

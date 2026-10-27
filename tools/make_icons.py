@@ -60,7 +60,7 @@ def main() -> None:
         print(f"logo {box['w']}x{box['h']}, dessin {cw}x{ch} en ({box['x0']}, {box['y0']})")
         if len(sys.argv) > 2 and sys.argv[2] == "--sample":
             pts = json.loads(sys.argv[3])
-            print(dict(zip(map(str, pts), page.evaluate("sample", pts))))
+            print(dict(zip(map(str, pts), page.evaluate("sample", pts), strict=True)))
         for name, (size, frac) in ICONS.items():
             scale = size * frac / max(cw, ch * 1.0)
             w, h = cw * scale, ch * scale

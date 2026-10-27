@@ -94,9 +94,7 @@ def main() -> int:
     if args.max_stores is not None:
         cfg["fetch"]["max_stores"] = args.max_stores
     try:
-        raw = engine.load_cached_raw(cfg) if args.offline else engine.get_raw(cfg, refresh=args.refresh)
-        if raw is None:
-            raise RuntimeError("Pas de données en cache : lancer sans --offline")
+        raw = engine.load_raw(cfg, args.offline, args.refresh)
         data = export_stores(engine.build_stores(raw), cfg, paris_fetched_at(raw),
                              engine.build_catalog(raw), raw.get("favorites", []))
         out = Path(args.out)

@@ -112,6 +112,17 @@ def get_raw(cfg: dict, refresh: bool = False, progress=None) -> dict:
     return fetch_raw(cfg, progress)
 
 
+def load_raw(cfg: dict, offline: bool = False, refresh: bool = False) -> dict:
+    """Données pour le CLI et l'export : `offline` = dernier cache quel que soit son âge,
+    sinon cache récent ou nouvelle récupération (`refresh` la force)."""
+    if not offline:
+        return get_raw(cfg, refresh=refresh)
+    raw = load_cached_raw(cfg)
+    if raw is None:
+        raise RuntimeError("Pas de données en cache : lancer sans --offline")
+    return raw
+
+
 def build_stores(raw: dict) -> list[Store]:
     """Restaurants dont le menu a été récupéré. Un favori absent du flux est reconstruit
     à partir de son seul menu (getStoreV1)."""

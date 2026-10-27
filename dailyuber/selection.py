@@ -143,7 +143,19 @@ def _unit_lower_bound(it: Item) -> float:
     return it.price
 
 
-def _min_subtotal_lines(items: list[Item], n: int, floor_cents: int, min_distinct: int):
+def _cents_tables(items: list[Item], n: int) -> tuple[list[int], list[int], list[list[int]]]:
+    """Tables en centimes communes à tous les seuils d'un même panier : borne inférieure du prix
+    unitaire, plus grand prix unitaire des articles restants, coût de 0 à `n` unités."""
+    m = len(items)
+    lb = [round(_unit_lower_bound(it) * 100) for it in items]
+    suffix_max = [0] * (m + 1)
+    for i in range(m - 1, -1, -1):
+        suffix_max[i] = max(round(items[i].price * 100), suffix_max[i + 1])
+    cost = [[round(item_cost(it, q)[0] * 100) for q in range(n + 1)] for it in items]
+    return lb, suffix_max, cost
+
+
+def _min_subtotal_lines(items: list[Item], n: int, floor_cents: int, min_distinct: int, tables=None):
     """Combinaison de `n` unités au sous-total minimal, sous-total >= floor_cents.
 
     Recherche en profondeur avec élagage (branch & bound) : les articles sont triés
@@ -151,11 +163,7 @@ def _min_subtotal_lines(items: list[Item], n: int, floor_cents: int, min_distinc
     pour les unités restantes. Calcul en centimes pour éviter les erreurs d'arrondi.
     """
     m = len(items)
-    lb = [round(_unit_lower_bound(it) * 100) for it in items]
-    suffix_max = [0] * (m + 1)
-    for i in range(m - 1, -1, -1):
-        suffix_max[i] = max(round(items[i].price * 100), suffix_max[i + 1])
-    cost = [[round(item_cost(it, q)[0] * 100) for q in range(n + 1)] for it in items]
+    lb, suffix_max, cost = tables or _cents_tables(items, n)
     best = [float("inf"), None]
     chosen: list[tuple[int, int]] = []
 
@@ -191,8 +199,16 @@ def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg:
     le meilleur de ces candidats est l'optimum exact. `item_filter(item)` restreint les plats
     autorisés (types de repas).
     """
-    mains = sorted((it for it in store.items if classifier.is_main(it) and (item_filter is None or item_filter(it))),
-                   key=_unit_lower_bound)
+    return _best_basket_of(store, people, sorted_mains(store, classifier, item_filter), fees_cfg, min_distinct)
+
+
+def sorted_mains(store: Store, classifier: MealClassifier, item_filter=None) -> list[Item]:
+    """Plats principaux du restaurant (filtrés), du moins cher au plus cher par unité."""
+    return sorted((it for it in store.items if classifier.is_main(it) and (item_filter is None or item_filter(it))),
+                  key=_unit_lower_bound)
+
+
+def _best_basket_of(store: Store, people: int, mains: list[Item], fees_cfg: dict, min_distinct: int) -> Basket | None:
     min_distinct = min(min_distinct, people)
     if len(mains) < min_distinct or not mains:
         return None
@@ -206,9 +222,10 @@ def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg:
         floors.add(fees_cfg["uber_one"]["min_subtotal"])
     if store.min_order:  # en dessous, la commande est refusée : aucun panier plus petit
         floors = {f for f in floors if f > store.min_order} | {store.min_order}
+    tables = _cents_tables(candidates, people)
     best = None
     for floor in sorted(floors):
-        lines = _min_subtotal_lines(candidates, people, round(floor * 100), min_distinct)
+        lines = _min_subtotal_lines(candidates, people, round(floor * 100), min_distinct, tables)
         if lines is None:
             continue
         b = build_basket(store, people, lines, fees_cfg)
@@ -249,14 +266,19 @@ def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None =
     sel = cfg["selection"]
     now = now or datetime.now(PARIS)
     available = {s.uuid: label for s in stores if (label := availability(s, when, now)) is not None}
+    # Plats principaux calculés une fois par restaurant, quelle que soit la taille du groupe.
+    mains = {}
+    for store in stores:
+        if store.uuid in available:
+            item_filter = (lambda it, s=store: bool(wanted.intersection(types.of(it, s)))) if types else None
+            mains[store.uuid] = sorted_mains(store, classifier, item_filter)
     result = {}
     for people in group_sizes or sel["group_sizes"]:
         baskets = []
         for store in stores:
-            if store.uuid not in available:
+            if store.uuid not in mains:
                 continue
-            item_filter = (lambda it, s=store: bool(wanted.intersection(types.of(it, s)))) if types else None
-            b = best_basket(store, people, classifier, cfg["fees"], sel.get("min_distinct_items", 1), item_filter)
+            b = _best_basket_of(store, people, mains[store.uuid], cfg["fees"], sel.get("min_distinct_items", 1))
             if b and b.per_person < sel["max_price_per_person"]:
                 b.score = score_basket(b, cfg)
                 b.availability = available[store.uuid]
@@ -270,7 +292,8 @@ def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None =
         kept, seen = [], set()
         for b in baskets:
             # Par plateforme : le même restaurant sur Uber Eats et Deliveroo reste visible deux fois.
-            keys = {("brand", b.store.platform, brand_key(b.store.title)), ("compo", b.store.platform, _composition_key(b))}
+            keys = {("brand", b.store.platform, brand_key(b.store.title)),
+                    ("compo", b.store.platform, _composition_key(b))}
             if keys & seen:
                 continue
             seen |= keys

@@ -23,12 +23,7 @@ def when_label(when: datetime | None) -> str:
 def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
         when: datetime | None = None, uber_one: bool | None = None,
         meal_types: list[str] | None = None, budget: float | None = None, sort: str = "score") -> str:
-    if offline:
-        raw = engine.load_cached_raw(cfg)
-        if raw is None:
-            raise RuntimeError("Pas de données en cache : lancer sans --offline")
-    else:
-        raw = engine.get_raw(cfg, refresh=refresh)
+    raw = engine.load_raw(cfg, offline, refresh)
     stores = engine.build_stores(raw)
     cfg = engine.with_uber_one(cfg, uber_one)
     if budget is not None:

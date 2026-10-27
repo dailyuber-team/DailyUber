@@ -1,13 +1,23 @@
 import random
 import time
+from datetime import datetime
 from itertools import combinations_with_replacement
 
 import pytest
 
+from dailyuber.hours import PARIS
 from dailyuber.models import Item, Store, ThresholdPromo
 from dailyuber.parser import parse_delivery_fee, parse_threshold_promos
-from dailyuber.selection import (MealClassifier, best_basket, best_threshold_discount, brand_key, build_basket,
-                                 compute_fees, item_cost, select_deals)
+from dailyuber.selection import (
+    MealClassifier,
+    best_basket,
+    best_threshold_discount,
+    brand_key,
+    build_basket,
+    compute_fees,
+    item_cost,
+    select_deals,
+)
 
 FEES = {"default_delivery_fee": 2.49, "service_fee_pct": 0.10, "service_fee_min": 0.99,
         "service_fee_max": 4.99, "small_order_threshold": 8.0, "small_order_fee": 2.0}
@@ -294,8 +304,9 @@ def test_select_deals_keeps_only_wanted_meal_types():
     s1 = store([Item("Menu burger", 6.5)], uuid="a", title="Burger House")
     s2 = store([Item("Plat crousty", 6.8)], uuid="b", title="Tasty Crousty")
     s3 = store([Item("Menu", 6.0)], uuid="c", title="Chez Toto")
-    now = __import__("datetime").datetime(2026, 10, 22, 12, 0, tzinfo=__import__("dailyuber.hours", fromlist=["PARIS"]).PARIS)
-    pick = lambda types: [b.store.uuid for b in select_deals([s1, s2, s3], cfg, [2], now=now, meal_types=types)[2]]
+    now = datetime(2026, 10, 22, 12, 0, tzinfo=PARIS)
+    def pick(types):
+        return [b.store.uuid for b in select_deals([s1, s2, s3], cfg, [2], now=now, meal_types=types)[2]]
     assert sorted(pick(None)) == ["a", "b", "c"]
     assert pick(["crousty"]) == ["b"]
     assert sorted(pick(["crousty", "burger"])) == ["a", "b"]
@@ -329,12 +340,13 @@ def test_always_excluded_keywords_beat_main_keywords():
 
 
 def test_select_deals_sorted_by_rating_then_price():
-    now = __import__("datetime").datetime(2026, 10, 22, 12, 0, tzinfo=__import__("dailyuber.hours", fromlist=["PARIS"]).PARIS)
+    now = datetime(2026, 10, 22, 12, 0, tzinfo=PARIS)
     stores = [store([Item("Menu", 6.0)], uuid="cheap", title="Pas cher"),            # 4.5 (défaut du helper)
               Store(uuid="top", title="Top", url="u", rating=4.81, eta_min=40, eta_max=45, items=[Item("Menu", 7.5)]),
               Store(uuid="top2", title="Top bis", url="u", rating=4.84, eta_min=10, eta_max=20, items=[Item("Menu", 7.0)]),
               Store(uuid="none", title="Sans note", url="u", items=[Item("Menu", 5.0)])]
-    ids = lambda sort: [b.store.uuid for b in select_deals(stores, CFG, [2], now=now, sort=sort)[2]]
+    def ids(sort):
+        return [b.store.uuid for b in select_deals(stores, CFG, [2], now=now, sort=sort)[2]]
     assert ids("score")[0] == "cheap"
     # 4,81 et 4,84 s'affichent tous deux "4,8" : à égalité, le moins cher passe devant.
     assert ids("rating") == ["top2", "top", "cheap", "none"]

@@ -142,6 +142,12 @@ DailyUber/
 - Les options obligatoires des articles personnalisables sont ignorées.
 - La classification des repas par mots-clés est imparfaite (« Maki anguille grillée 6 € » passe pour un plat).
 
+**Nettoyage du 27/10 (sans changement de comportement)** :
+- Vérifié par une sortie de référence : `data.json` exporté et 1 319 offres calculées (1 à 6 personnes, plusieurs heures, Uber One, types, classements, budget) à partir du même cache, **identiques octet par octet** avant et après.
+- `selection.select_deals` calcule les plats principaux d'un restaurant une fois pour toutes les tailles de groupe (`sorted_mains`), et `_cents_tables` est partagé par tous les seuils d'un panier, comme dans `engine.js` : sélection environ 2,5 fois plus rapide (18,2 s → 7,3 s sur la référence).
+- `engine.load_raw` (cache ou récupération, utilisé par le CLI et l'export) ; `parser.NUM` / `parser.to_float` partagés avec `deliveroo.py`.
+- `pyproject.toml` : réglages de `pytest` et de `ruff` (`ruff check .` : aucune alerte) ; `.gitattributes` : fins de ligne LF partout.
+
 ## 5. Décisions déjà prises
 
 - Python + Playwright (session navigateur) + endpoints JSON. Pas de parsing HTML.

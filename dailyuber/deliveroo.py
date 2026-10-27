@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 
 from .hours import PARIS
 from .models import Item, Store, ThresholdPromo
+from .parser import NUM, to_float
 
 log = logging.getLogger(__name__)
 
@@ -30,15 +31,10 @@ BASE_URL = "https://deliveroo.fr"
 GEOCODER = "https://api-adresse.data.gouv.fr/search/"  # géocodeur public de l'État, sans clé
 BOGO_MAX = 1  # "1 plat acheté = 1 plat offert" : nombre d'applications inconnu, on reste prudent
 _NEXT_DATA = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
-_NUM = r"(\d+(?:[.,]\d+)?)"
 
 
 class DeliverooError(RuntimeError):
     pass
-
-
-def _num(s: str) -> float:
-    return float(s.replace(",", "."))
 
 
 def geohash(lat: float, lng: float, precision: int = 12) -> str:
@@ -140,14 +136,14 @@ def parse_promos(texts: list[str]) -> tuple[list[ThresholdPromo], float | None]:
     promos, free_min = [], None
     for t in texts:
         t = t.replace("‪", "").replace("‬", "")
-        if m := re.search(rf"commandez pour\s*{_NUM}\s*€.*?-\s*{_NUM}\s*%", t, re.I):
-            promos.append(ThresholdPromo(_num(m[1]), pct_off=_num(m[2]) / 100, label=t))
-        elif m := re.search(rf"commandez pour\s*{_NUM}\s*€.*?-\s*{_NUM}\s*€", t, re.I):
-            promos.append(ThresholdPromo(_num(m[1]), amount_off=_num(m[2]), label=t))
-        elif m := re.search(rf"commandez pour\s*{_NUM}\s*€.*livraison", t, re.I):
-            free_min = _num(m[1]) if free_min is None else min(free_min, _num(m[1]))
-        elif m := re.search(rf"offert dès\s*{_NUM}\s*€", t, re.I):
-            promos.append(ThresholdPromo(_num(m[1]), label=t))
+        if m := re.search(rf"commandez pour\s*{NUM}\s*€.*?-\s*{NUM}\s*%", t, re.I):
+            promos.append(ThresholdPromo(to_float(m[1]), pct_off=to_float(m[2]) / 100, label=t))
+        elif m := re.search(rf"commandez pour\s*{NUM}\s*€.*?-\s*{NUM}\s*€", t, re.I):
+            promos.append(ThresholdPromo(to_float(m[1]), amount_off=to_float(m[2]), label=t))
+        elif m := re.search(rf"commandez pour\s*{NUM}\s*€.*livraison", t, re.I):
+            free_min = to_float(m[1]) if free_min is None else min(free_min, to_float(m[1]))
+        elif m := re.search(rf"offert dès\s*{NUM}\s*€", t, re.I):
+            promos.append(ThresholdPromo(to_float(m[1]), label=t))
     return promos, free_min
 
 
@@ -193,8 +189,8 @@ def build_store(rid: str, listing: dict, menu: dict, presence: dict[str, list[st
     if progress.get("typeName") == "FreeDeliveryOffer" and progress.get("minimumOrderValue"):
         value = progress["minimumOrderValue"]["fractional"] / 100
         free_min = value if free_min is None else min(free_min, value)
-    fee = re.search(rf"{_NUM}\s*€ de livraison", joined)
-    min_order = re.search(rf"Montant min\.? de\s*{_NUM}\s*€", joined)
+    fee = re.search(rf"{NUM}\s*€ de livraison", joined)
+    min_order = re.search(rf"Montant min\.? de\s*{NUM}\s*€", joined)
     closes = re.search(r"Ferme à\s*(\d{1,2}:\d{2})", joined)
     opens = re.search(r"Ouvre (?:à|le)[^|]*", joined)
     now = now_ids.get(rid)
@@ -230,12 +226,12 @@ def build_store(rid: str, listing: dict, menu: dict, presence: dict[str, list[st
         uuid=f"deliveroo:{rid}", title=listing["name"], url=BASE_URL + "/fr" + urllib.parse.quote(listing["href"]),
         rating=listing.get("rating"), rating_count=listing.get("rating_count") or 0,
         eta_min=eta[0] if eta else None, eta_max=eta[1] if eta else None,
-        delivery_fee=_num(fee[1]) if fee else None, free_delivery_min=free_min,
+        delivery_fee=to_float(fee[1]) if fee else None, free_delivery_min=free_min,
         signposts=listing.get("promos") or [], threshold_promos=promos,
         is_open=is_open, open_until=f"Ouvert jusqu'à {closes[1]}" if closes else (opens[0].strip() if opens else ""),
         hours=None, delivery_slots=_slots(presence, rid),
         cuisines=header[:distance] if distance else [],
-        platform="deliveroo", min_order=_num(min_order[1]) if min_order else None,
+        platform="deliveroo", min_order=to_float(min_order[1]) if min_order else None,
         lat=coords[0] if coords else None, lng=coords[1] if coords else None,
         items=items,
     )

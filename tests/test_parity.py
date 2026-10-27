@@ -105,16 +105,16 @@ def run_node(tmp_path: Path, data: dict, cases: list[dict], rounding: list) -> d
 
 
 def assert_same(stores, cfg, fetched_at, cases, js_deals):
-    for c, js in zip(cases, js_deals):
+    for c, js in zip(cases, js_deals, strict=True):
         py = python_deals(stores, cfg, fetched_at, c)
         assert js == py, f"Différence pour {c}"
 
 
-def test_python_round_is_reproduced():
+def test_python_round_is_reproduced(tmp_path):
     rng = random.Random(1)
     values = [rng.uniform(0, 60) for _ in range(2000)] + [k / 1000 for k in range(0, 20000, 5)] + [0.125, 2.675, 1.005]
     rounding = [[x, n] for x in values for n in (0, 2, 4)] + [[x * 100, 0] for x in values]
-    js = run_node(Path(__import__("tempfile").mkdtemp()), {"config": {}, "stores": [], "fetched_at": ""}, [], rounding)
+    js = run_node(tmp_path, {"config": {}, "stores": [], "fetched_at": ""}, [], rounding)
     assert js["rounded"] == [round(x, n) for x, n in rounding]
 
 

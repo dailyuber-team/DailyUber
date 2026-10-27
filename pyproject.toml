@@ -1,0 +1,19 @@
+# Réglages des outils de développement (le projet n'est pas un paquet installable).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+extend-exclude = [".venv", "data", "_site"]
+
+[tool.ruff.lint]
+# Erreurs, style, imports, bugs probables, syntaxe moderne, simplifications.
+select = ["E", "F", "W", "B", "UP", "SIM", "I", "PIE", "RET", "PERF", "C4"]
+ignore = [
+    "SIM108",  # un if/else sur plusieurs lignes se lit souvent mieux qu'un ternaire imbriqué
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # données de test sur une ligne
