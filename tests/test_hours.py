@@ -104,3 +104,13 @@ def test_resolve_target():
     assert resolve_target("12:30", None, THU_1245) == at(3, 12, 30)            # marge de 30 min
     assert resolve_target("12:00", "demain", THU_1245) == at(4, 12)
     assert resolve_target("20:00", "2026-10-26", THU_1245) == at(7, 20)
+
+
+def test_availability_now_excludes_store_not_open_yet_even_if_uber_says_open():
+    # Constaté le 27/10 : "Nona Pasta", isOpen=True, workingHoursTagline "Ouvre à 18:00".
+    s = _store(is_open=True, open_until="Ouvre à 18:00", hours=None)
+    assert availability(s, None, THU_1245) is None
+    assert availability(_store(is_open=True, open_until="Disponible Samedi à 0:00"), None, THU_1245) is None
+    # Pour plus tard, ce sont les créneaux qui décident
+    s.delivery_slots = SLOTS
+    assert availability(s, at(4, 11, 40), THU_1245) == "Créneau 11:30–12:00"

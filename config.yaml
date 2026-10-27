@@ -9,7 +9,9 @@ address:
   reference: "EipDciBNaXJhYmVhdSwgMTMxMDAgQWl4LWVuLVByb3ZlbmNlLCBGcmFuY2UiLiosChQKEgnLZxrRl43JEhGDes8JkrzvORIUChIJWRK5BKONyRIRo4i2yL5TuVw"
 
 fetch:
-  max_feed_pages: 3          # ~80-100 restaurants par page
+  max_feed_pages: 0          # ~80 restaurants par page ; 0 = toutes (environ 400 restaurants, 5 pages, le 27/10). Les restaurants pas encore
+                             # ouverts sont en fin de flux : avec 3 pages, une recherche à 10-11 h
+                             # ratait ceux qui ouvrent à midi ou le soir.
   max_stores: 40             # nombre max de menus récupérés (1 requête chacun) ; 0 = tous
                              # (GitHub Actions les récupère tous : --max-stores 0)
   min_delay_s: 2.0           # délai aléatoire entre deux requêtes

@@ -60,7 +60,10 @@ def parse_feed_store(raw: dict) -> Store:
     signposts = [s.get("text", "").strip() for s in raw.get("signposts") or []]
     action = (raw.get("actionUrl") or "").split("?")[0]
     delivery_fee, free_delivery_min = parse_delivery_fee(meta_texts + signposts)
+    marker = raw.get("mapMarker") or {}
     return Store(
+        lat=marker.get("latitude"),
+        lng=marker.get("longitude"),
         uuid=raw["storeUuid"],
         title=raw["title"]["text"],
         url=f"{BASE_URL}/fr{action}" if action else BASE_URL,
@@ -122,6 +125,9 @@ def parse_store_details(store: Store, raw: dict) -> Store:
     store.hours = parse_hours(raw.get("hours"))
     store.delivery_slots = parse_delivery_slots(raw.get("adaptedDeliveryHoursInfos"))
     store.cuisines = [c.strip() for c in raw.get("cuisineList") or [] if isinstance(c, str)]
+    loc = raw.get("location") or {}
+    if loc.get("latitude") is not None and loc.get("longitude") is not None:  # plus précis que le flux
+        store.lat, store.lng = loc["latitude"], loc["longitude"]
     if store.rating is None:
         stats = (raw.get("storeInfoMetadata") or {}).get("rawRatingStats") or {}
         if stats.get("storeRatingScore"):

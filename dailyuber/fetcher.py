@@ -16,6 +16,7 @@ from playwright.sync_api import sync_playwright
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://www.ubereats.com"
+MAX_FEED_PAGES = 30  # garde-fou pour max_feed_pages: 0 (le flux d'Aix : environ 400 restaurants, 5 pages)
 
 FEED_BODY = {
     "cacheKey": "", "feedSessionCount": {"announcementCount": 0, "announcementLabel": ""},
@@ -96,7 +97,9 @@ class UberEatsSession:
     def fetch_feed(self) -> list[dict]:
         """Retourne les entrées REGULAR_STORE brutes du flux, toutes pages confondues."""
         stores, seen = [], set()
-        body, pages = dict(FEED_BODY), self.cfg["fetch"]["max_feed_pages"]
+        # 0 = jusqu'à la dernière page. Uber place les restaurants pas encore ouverts en fin de
+        # flux : lire seulement les premières pages les fait disparaître le matin.
+        body, pages = dict(FEED_BODY), self.cfg["fetch"]["max_feed_pages"] or MAX_FEED_PAGES
         for page_no in range(pages):
             data = self.api("getFeedV1", body)
             for item in data.get("feedItems", []):

@@ -126,7 +126,7 @@ def test_export_has_catalog_and_favorites(cfg):
     with_menu = {s["uuid"] for s in data["stores"]}
     assert with_menu == {U[0], U[1], U[3], U[5]}
     assert [c["uuid"] for c in data["catalog"]] == [U[2]]          # seulement ceux sans menu
-    assert set(data["catalog"][0]) == {"uuid", "title", "url", "rating", "rating_count", "eta_min", "eta_max"}
+    assert set(data["catalog"][0]) == {"uuid", "title", "url", "rating", "rating_count", "eta_min", "eta_max", "lat", "lng"}
     assert data["favorites"] == [U[3], U[5]]
     json.dumps(data)  # sérialisable tel quel
 

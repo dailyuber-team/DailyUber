@@ -28,12 +28,15 @@ let data = null;
 const prefs = loadPrefs();
 let favs = loadFavs();
 let index = new Map(); // uuid -> restaurant avec menu (data.stores) ou sans (data.catalog)
+// Position GPS pour "Autour de moi" : jamais enregistrée, redemandée à chaque ouverture.
+const geo = { pos: null, status: "off" }; // status : off | pending | ok | denied | unavailable
 let memo = { key: "", baskets: [] }; // paniers du dernier calcul : le budget ne fait que les filtrer
 
 // --- Préférences (mémorisées sur le téléphone) ---------------------------------------------
 
 function loadPrefs() {
-  const defaults = { tab: "deals", people: 2, when: "now", time: defaultTime(), budget: 10, uberOne: false, types: [] };
+  const defaults = { tab: "deals", people: 2, when: "now", time: defaultTime(), budget: 10, uberOne: false, types: [],
+    nearMe: false, radiusKm: 2 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") };
   } catch {
@@ -79,6 +82,58 @@ function toggleFav(uuid) {
   changed();
 }
 
+// --- Autour de moi ---------------------------------------------------------------------------
+
+/** Distance à vol d'oiseau en km (formule de haversine). */
+function distanceKm(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+/** Distance du restaurant à ma position, ou null (position inconnue, coordonnées absentes). */
+function storeDistance(s) {
+  return geo.pos && s.lat != null && s.lng != null ? distanceKm(geo.pos, s) : null;
+}
+
+const km = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
+const kmLabel = (d) => (d < 1 ? `${Math.max(50, Math.round(d * 1000 / 50) * 50)} m` : `${km.format(d)} km`);
+
+function locate() {
+  if (!("geolocation" in navigator)) {
+    geo.status = "unavailable";
+    changed();
+    return;
+  }
+  geo.status = "pending";
+  syncControls();
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      geo.pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+      geo.status = "ok";
+      changed();
+    },
+    (err) => {
+      geo.status = err.code === err.PERMISSION_DENIED ? "denied" : "unavailable";
+      changed();
+    },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60000 },
+  );
+}
+
+/** Le filtre "Autour de moi" s'applique-t-il ? (sinon, tous les restaurants) */
+const nearActive = () => prefs.nearMe && geo.status === "ok";
+
+function nearCaption() {
+  if (!prefs.nearMe) return "Seulement les restaurants proches de ta position";
+  if (geo.status === "pending") return "Recherche de ta position…";
+  if (geo.status === "denied") return "Localisation refusée : autorise-la dans les réglages du navigateur";
+  if (geo.status === "unavailable") return "Position introuvable pour le moment : tous les restaurants sont affichés";
+  if (geo.status === "ok" && data.center) return `Tu es à ${kmLabel(distanceKm(geo.pos, data.center))} du ${data.address.split(",")[0]}`;
+  return "Position trouvée";
+}
+
 /** Heure proposée par défaut : midi et demi le matin, 19h30 l'après-midi. */
 function defaultTime() {
   const m = parisParts(Date.now()).minute;
@@ -120,6 +175,17 @@ function setupControls() {
   budget.value = prefs.budget;
   budget.addEventListener("input", () => { prefs.budget = Number(budget.value); changed(); });
 
+  $("near-me").checked = prefs.nearMe;
+  $("near-me").addEventListener("change", (e) => {
+    prefs.nearMe = e.target.checked;
+    if (prefs.nearMe) locate(); // position fraîche à chaque activation
+    changed();
+  });
+  const radius = $("radius");
+  radius.value = prefs.radiusKm;
+  radius.addEventListener("input", () => { prefs.radiusKm = Number(radius.value); changed(); });
+  if (prefs.nearMe) locate();
+
   $("uber-one").checked = prefs.uberOne;
   $("uber-one").addEventListener("change", (e) => { prefs.uberOne = e.target.checked; changed(); });
 
@@ -160,6 +226,11 @@ function syncControls() {
   $("budget-value").textContent = `${euroShort.format(prefs.budget)} / pers`;
   const b = $("budget");
   b.style.setProperty("--pct", `${((prefs.budget - b.min) / (b.max - b.min)) * 100}%`);
+  $("radius-row").hidden = !prefs.nearMe;
+  $("near-caption").textContent = nearCaption();
+  $("radius-value").textContent = `${km.format(prefs.radiusKm)} km`;
+  const r = $("radius");
+  r.style.setProperty("--pct", `${((prefs.radiusKm - r.min) / (r.max - r.min)) * 100}%`);
   for (const chip of $("types").children) {
     const t = chip.dataset.type;
     chip.setAttribute("aria-pressed", String(t ? prefs.types.includes(t) : prefs.types.length === 0));
@@ -205,7 +276,11 @@ function render() {
     memo = { key, baskets: bestBaskets(data.stores, cfg, {
       people: prefs.people, whenMs, nowMs: Date.parse(data.fetched_at), mealTypes: prefs.types }) };
   }
-  const deals = rankDeals(memo.baskets, cfg, TOP_N, "rating");
+  // Le rayon ne fait que filtrer les paniers déjà calculés, comme le budget.
+  const pool = nearActive()
+    ? memo.baskets.filter((b) => { const d = storeDistance(b.store); return d !== null && d <= prefs.radiusKm; })
+    : memo.baskets;
+  const deals = rankDeals(pool, cfg, TOP_N, "rating");
 
   const n = deals.length;
   $("results-title").textContent = n ? `${n} offre${n > 1 ? "s" : ""} pour ${prefs.people}` : "Aucune offre";
@@ -214,6 +289,8 @@ function render() {
   if (raise) raise.addEventListener("click", () => { prefs.budget = Number($("budget").max); $("budget").value = prefs.budget; changed(); });
   const all = $("all-types");
   if (all) all.addEventListener("click", () => { prefs.types = []; changed(); });
+  const widen = $("widen-radius");
+  if (widen) widen.addEventListener("click", () => { prefs.radiusKm = Number($("radius").max); $("radius").value = prefs.radiusKm; changed(); });
 }
 
 /** Onglet Favoris : meilleur panier de chaque favori avec les réglages du moment (personnes,
@@ -276,6 +353,8 @@ function storeMeta(s) {
   const meta = [];
   if (s.rating) meta.push(`${ICONS.star}${s.rating.toFixed(1).replace(".", ",")}${s.rating_count ? ` (${count.format(s.rating_count)})` : ""}`);
   if (s.eta_min) meta.push(s.eta_min === s.eta_max || !s.eta_max ? `${s.eta_min} min` : `${s.eta_min}–${s.eta_max} min`);
+  const d = storeDistance(s);
+  if (d !== null) meta.push(kmLabel(d));
   return meta;
 }
 
@@ -358,15 +437,16 @@ function dealCard(b, k, { favorites = false } = {}) {
 }
 
 function emptyState() {
-  const budgetMax = Number($("budget").max);
+  const budgetMax = Number($("budget").max), radiusMax = Number($("radius").max);
   const actions = [];
-  if (prefs.types.length) actions.push('<button type="button" id="all-types">Tous les types de repas</button>');
+  if (nearActive() && prefs.radiusKm < radiusMax) actions.push(`<button type="button" id="widen-radius">Élargir à ${km.format(radiusMax)} km</button>`);
+  else if (prefs.types.length) actions.push('<button type="button" id="all-types">Tous les types de repas</button>');
   else if (prefs.budget < budgetMax) actions.push(`<button type="button" id="raise-budget">Monter à ${euroShort.format(budgetMax)} / pers</button>`);
   return `
   <li class="empty">
     ${ICONS.bag}
-    <h3>Rien sous ${euroShort.format(prefs.budget)} par personne</h3>
-    <p>Essaie un autre type de repas, une autre heure ou un budget plus élevé.</p>
+    <h3>Rien sous ${euroShort.format(prefs.budget)} par personne${nearActive() ? ` à moins de ${km.format(prefs.radiusKm)} km` : ""}</h3>
+    <p>Essaie un autre type de repas, une autre heure, un budget plus élevé${nearActive() ? " ou un rayon plus large" : ""}.</p>
     ${actions.join("")}
   </li>`;
 }
@@ -431,5 +511,10 @@ async function load() {
 watchTitle();
 load();
 // Les créneaux "maintenant" dépendent de l'heure : on recalcule quand l'appli revient au premier plan.
-document.addEventListener("visibilitychange", () => { if (!document.hidden && data) { describeFetch(); render(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !data) return;
+  describeFetch();
+  if (prefs.nearMe) locate(); // on a pu se déplacer depuis la dernière ouverture
+  render();
+});
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

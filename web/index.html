@@ -65,6 +65,21 @@
         </label>
         <input class="switch" type="checkbox" role="switch" id="uber-one">
       </div>
+
+      <div class="row">
+        <label class="row-label" for="near-me">Autour de moi
+          <span class="row-caption" id="near-caption">Seulement les restaurants proches de ta position</span>
+        </label>
+        <input class="switch" type="checkbox" role="switch" id="near-me">
+      </div>
+      <div class="row row-stack" id="radius-row" hidden>
+        <div class="row-line">
+          <label class="row-label" for="radius">Rayon</label>
+          <span class="row-value" id="radius-value">2 km</span>
+        </div>
+        <input class="slider" type="range" id="radius" min="0.5" max="5" step="0.5" value="2"
+               aria-describedby="radius-value">
+      </div>
     </section>
 
     <section id="types-section">

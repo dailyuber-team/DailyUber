@@ -6,6 +6,7 @@
 
 const MAX_CANDIDATES = 40; // plats les moins chers considérés par restaurant (plus tous les 1+1)
 const NOW_MARGIN_MIN = 30; // une heure visée à moins de 30 min est traitée comme "maintenant"
+const NOT_OPEN_YET = ["Ouvre", "Disponible"]; // workingHoursTagline d'un restaurant fermé : "Ouvre à 18:00"
 
 // round() de Python : arrondi sur la valeur binaire exacte, égalité vers le chiffre pair.
 // (Math.round et toFixed arrondissent autrement, ce qui décalerait des centimes.)
@@ -75,7 +76,9 @@ function isOpenAt(weekly, parts) {
 /** hours.availability : libellé de disponibilité, ou null si le restaurant n'est pas commandable. */
 export function availability(store, whenMs, nowMs) {
   if (whenMs == null || whenMs - nowMs <= NOW_MARGIN_MIN * 60000) {
-    if (!store.is_open) return null;
+    // Uber répond is_open pour un restaurant pas encore ouvert ("Ouvre à 18:00") :
+    // seuls ce libellé et les horaires disent qu'il est fermé en ce moment.
+    if (!store.is_open || NOT_OPEN_YET.some((p) => (store.open_until || "").startsWith(p))) return null;
     if (store.hours != null && !isOpenAt(store.hours, parisParts(nowMs))) return null;
     return store.open_until || "Ouvert";
   }

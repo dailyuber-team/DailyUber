@@ -18,7 +18,7 @@ from .models import Store
 from .selection import MealClassifier, MealTypes
 
 log = logging.getLogger("dailyuber")
-FORMAT_VERSION = 2  # 2 : catalog et favorites
+FORMAT_VERSION = 3  # 2 : catalog et favorites ; 3 : lat/lng des restaurants et center
 
 
 def paris_fetched_at(raw: dict) -> datetime:
@@ -43,6 +43,7 @@ def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime,
         out.append({
             "uuid": s.uuid, "title": s.title, "url": s.url,
             "rating": s.rating, "rating_count": s.rating_count, "eta_min": s.eta_min, "eta_max": s.eta_max,
+            "lat": s.lat, "lng": s.lng,
             "delivery_fee": s.delivery_fee, "free_delivery_min": s.free_delivery_min,
             "threshold_promos": [{"min_subtotal": p.min_subtotal, "pct_off": p.pct_off,
                                   "amount_off": p.amount_off, "label": p.label} for p in s.threshold_promos],
@@ -56,12 +57,14 @@ def export_stores(stores: list[Store], cfg: dict, fetched_at: datetime,
     for s in [*stores, *(catalog or [])]:  # menu récupéré d'abord : infos les plus complètes
         if s.uuid not in exported and s.uuid not in light:
             light[s.uuid] = {"uuid": s.uuid, "title": s.title, "url": s.url, "rating": s.rating,
-                             "rating_count": s.rating_count, "eta_min": s.eta_min, "eta_max": s.eta_max}
+                             "rating_count": s.rating_count, "eta_min": s.eta_min, "eta_max": s.eta_max,
+                             "lat": s.lat, "lng": s.lng}
     sel = cfg["selection"]
     return {
         "version": FORMAT_VERSION,
         "fetched_at": fetched_at.isoformat(timespec="seconds"),
         "address": cfg["address"]["label"],
+        "center": {"lat": cfg["address"]["latitude"], "lng": cfg["address"]["longitude"]},
         "config": {
             "fees": cfg["fees"],
             "selection": {"max_price_per_person": sel["max_price_per_person"],

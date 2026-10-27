@@ -10,6 +10,7 @@ L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fo
 
 - chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul, sur **tous** les restaurants bien notés (environ 200, un quart d'heure de recherche), et publie les offres ;
 - dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
+- **Autour de moi** : n'affiche que les restaurants à moins de 0,5 à 5 km de ta position (le téléphone demande l'autorisation de localisation ; la position n'est pas enregistrée). La recherche, elle, est toujours faite depuis le centre d'Aix ;
 - le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats ;
 - l'onglet **Favoris** montre directement tes restaurants préférés (voir plus bas).
 

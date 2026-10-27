@@ -64,7 +64,9 @@
 
 **Validé quand** : on lance l'appli, on choisit 3 personnes, on voit des offres, puis on passe à 5 personnes et le résultat change instantanément.
 
-## Phase 4 — Zone géographique
+## Phase 4 — Zone géographique ✅ en version simple (27/10/2026)
+> Choix de l'utilisateur : **rayon autour de moi** (GPS du téléphone, 0,5 à 5 km), avec un seul point de recherche au centre d'Aix. Pas de carte ni de quartiers prédéfinis. Plan d'origine :
+
 - Choix sur une **carte (Leaflet + OpenStreetMap)** : un point central (clic sur la carte ou recherche d'adresse) et un **rayon** (curseur, par ex. de 0,5 à 5 km), affiché sous forme de cercle.
 - Filtrage par distance (formule de haversine) entre le point central et `mapMarker` (latitude/longitude) de chaque restaurant.
 - Le flux Uber dépend de l'adresse de livraison. Pour une grande zone, il faut **plusieurs points de requête** (grille espacée d'environ 2 km) et dédoublonner les restaurants. Attention au volume de requêtes : afficher une estimation (« ~6 min, ~120 requêtes »).

@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 PARIS = ZoneInfo("Europe/Paris")
 DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 NOW_MARGIN_MIN = 30  # une heure visée à moins de 30 min est traitée comme "maintenant"
+NOT_OPEN_YET = ("Ouvre", "Disponible")  # workingHoursTagline d'un restaurant fermé : "Ouvre à 18:00"
 
 # jour de la semaine (0 = lundi) -> plages [début, fin) en minutes, fin <= 1440
 WeeklyHours = dict[int, list[tuple[int, int]]]
@@ -82,7 +83,9 @@ def availability(store, when: datetime | None, now: datetime) -> str | None:
       est dans leur horizon (environ 5 jours), sinon aux horaires d'ouverture.
     """
     if when is None or when - now <= timedelta(minutes=NOW_MARGIN_MIN):
-        if not store.is_open:
+        # Uber répond isOpen=True pour un restaurant pas encore ouvert ("Ouvre à 18:00") :
+        # seuls ce libellé et les horaires disent qu'il est fermé en ce moment.
+        if not store.is_open or store.open_until.startswith(NOT_OPEN_YET):
             return None
         if store.hours is not None and not is_open_at(store.hours, now):
             return None
