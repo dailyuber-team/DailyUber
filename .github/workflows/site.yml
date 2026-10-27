@@ -27,7 +27,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # environ 370 menus Uber Eats + 90 pages Deliveroo, à 2-5 s d'intervalle
+    timeout-minutes: 90  # 27/10 : 51 min (508 menus Uber Eats + 91 pages Deliveroo, à 2-5 s d'intervalle)
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
