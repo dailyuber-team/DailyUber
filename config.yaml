@@ -48,6 +48,27 @@ meal:
                      accompagnement, frite, side, supplément, extra, entrée, snack, enfant,
                      kid, cookie, brownie, tiramisu, verrine, dip, nugget]
 
+# Types de repas (filtre de l'appli et --type). Un plat est d'un type si son titre ou sa
+# section contient un des mots-clés ; sinon il prend les types du restaurant, d'après
+# sa liste de cuisines Uber Eats ("Italienne", "Sushis"...).
+meal_types:
+  burger:      {label: "Burger", keywords: [burger, smash, cheeseburger], cuisines: [burgers]}
+  pizza:       {label: "Pizza", keywords: [pizza, margherita, calzone], cuisines: [pizzas]}
+  sushi:       {label: "Sushi & japonais", keywords: [sushi, maki, california, sashimi, chirashi, gunkan,
+                                                     nigiri, temaki, ramen, donburi, yakitori], cuisines: [japonaise, sushis]}
+  asiatique:   {label: "Asiatique", keywords: [wok, bo bun, nouilles, pad thaï, pad thai, nems, dim sum, banh mi,
+                                              riz cantonais, bibimbap, curry], cuisines: [asiatique, asiatique (fusion),
+                                              chinoise, thaïlandaise, vietnamienne, coréenne, indienne]}
+  poke:        {label: "Poké", keywords: [poke, poké, bowl], cuisines: [poke (poisson cru)]}
+  tacos_kebab: {label: "Tacos & kebab", keywords: [tacos, kebab, döner, doner, durum, dürüm, shawarma], cuisines: [tacos, kebab, turque]}
+  sandwich:    {label: "Sandwich & boulangerie", keywords: [sandwich, wrap, panini, bagel, croque, baguette, club],
+                cuisines: [sandwich, boulangerie]}
+  salade:      {label: "Salade & healthy", keywords: [salade, healthy, veggie], cuisines: [salades, cuisine saine,
+                                                                                         végétarienne, 100 % végétarien]}
+  pates:       {label: "Pâtes & italien", keywords: [pâtes, pasta, lasagne, risotto, gnocchi, carbonara, bolognaise,
+                                                    spaghetti, penne, tagliatelle], cuisines: [italienne, pâtes]}
+  poulet:      {label: "Poulet", keywords: [poulet, chicken, tenders, wings, crousty, nuggets], cuisines: [poulet]}
+
 selection:
   group_sizes: [2, 4]
   max_price_per_person: 10.00

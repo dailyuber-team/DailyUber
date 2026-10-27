@@ -86,6 +86,7 @@ def parse_store_details(store: Store, raw: dict) -> Store:
     store.open_until = raw.get("workingHoursTagline") or ""
     store.hours = parse_hours(raw.get("hours"))
     store.delivery_slots = parse_delivery_slots(raw.get("adaptedDeliveryHoursInfos"))
+    store.cuisines = [c.strip() for c in raw.get("cuisineList") or [] if isinstance(c, str)]
     if store.rating is None:
         stats = (raw.get("storeInfoMetadata") or {}).get("rawRatingStats") or {}
         if stats.get("storeRatingScore"):

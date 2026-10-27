@@ -34,6 +34,26 @@ class MealClassifier:
         return title_main or section_main
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.replace(" ", " ").lower().split())
+
+
+class MealTypes:
+    """Types de repas d'un plat : mots-clés du titre ou de la section, sinon cuisines du restaurant."""
+
+    def __init__(self, types_cfg: dict):
+        self.keywords = {t: _kw_regex(c["keywords"]) for t, c in types_cfg.items()}
+        self.cuisines = {t: {_norm(x) for x in c.get("cuisines", [])} for t, c in types_cfg.items()}
+
+    def of(self, item: Item, store: Store) -> list[str]:
+        text = f"{item.title} {item.section}"
+        found = [t for t, rx in self.keywords.items() if rx.search(text)]
+        if found:
+            return found
+        cuisines = {_norm(c) for c in store.cuisines}
+        return [t for t, cs in self.cuisines.items() if cs & cuisines]
+
+
 def item_cost(item: Item, qty: int) -> tuple[float, int]:
     """Coût de `qty` unités d'un article, et nombre d'unités offertes ("X achetés = Y offerts")."""
     free = 0
@@ -146,15 +166,17 @@ def _min_subtotal_lines(items: list[Item], n: int, floor_cents: int, min_distinc
 
 
 def best_basket(store: Store, people: int, classifier: MealClassifier, fees_cfg: dict,
-                min_distinct: int = 1) -> Basket | None:
+                min_distinct: int = 1, item_filter=None) -> Basket | None:
     """Panier le moins cher (frais et promos compris) de `people` plats principaux.
 
     Le coût total ne dépend que du sous-total des articles et croît avec lui, sauf
     aux seuils (promo "dès Y €", livraison offerte dès X €, fin des frais de petite
     commande, minimum Uber One). Pour chaque seuil, on cherche le plus petit sous-total qui l'atteint ;
-    le meilleur de ces candidats est l'optimum exact.
+    le meilleur de ces candidats est l'optimum exact. `item_filter(item)` restreint les plats
+    autorisés (types de repas).
     """
-    mains = sorted((it for it in store.items if classifier.is_main(it)), key=_unit_lower_bound)
+    mains = sorted((it for it in store.items if classifier.is_main(it) and (item_filter is None or item_filter(it))),
+                   key=_unit_lower_bound)
     min_distinct = min(min_distinct, people)
     if len(mains) < min_distinct or not mains:
         return None
@@ -197,9 +219,13 @@ def _composition_key(b: Basket) -> tuple:
 
 
 def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None = None,
-                 when: datetime | None = None, now: datetime | None = None) -> dict[int, list[Basket]]:
-    """Top N par taille de groupe. `when` : heure de livraison visée (None = maintenant)."""
+                 when: datetime | None = None, now: datetime | None = None,
+                 meal_types: list[str] | None = None) -> dict[int, list[Basket]]:
+    """Top N par taille de groupe. `when` : heure de livraison visée (None = maintenant).
+    `meal_types` : ne garder que les plats de ces types (None ou vide = tous)."""
     classifier = MealClassifier(cfg["meal"])
+    types = MealTypes(cfg.get("meal_types") or {}) if meal_types else None
+    wanted = set(meal_types or [])
     sel = cfg["selection"]
     now = now or datetime.now(PARIS)
     available = {s.uuid: label for s in stores if (label := availability(s, when, now)) is not None}
@@ -209,7 +235,8 @@ def select_deals(stores: list[Store], cfg: dict, group_sizes: list[int] | None =
         for store in stores:
             if store.uuid not in available:
                 continue
-            b = best_basket(store, people, classifier, cfg["fees"], sel.get("min_distinct_items", 1))
+            item_filter = (lambda it, s=store: bool(wanted.intersection(types.of(it, s)))) if types else None
+            b = best_basket(store, people, classifier, cfg["fees"], sel.get("min_distinct_items", 1), item_filter)
             if b and b.per_person < sel["max_price_per_person"]:
                 b.score = score_basket(b, cfg)
                 b.availability = available[store.uuid]

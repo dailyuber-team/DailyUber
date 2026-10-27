@@ -4,6 +4,36 @@ Trouve les meilleurs plans Uber Eats autour d'Aix-en-Provence pour manger de 1 �
 
 L'outil parcourt les restaurants livrables, lit leurs menus et leurs promos (1 acheté = 1 offert, -20 % dès X €…), compose le panier le moins cher, puis ajoute les frais de livraison et de service. Il affiche le top 5 des offres pour chaque taille de groupe.
 
+## L'appli sur téléphone
+
+L'appli est en ligne sur **https://dailyuber-team.github.io/DailyUber/** (une fois GitHub Pages activé, voir plus bas). Elle n'a pas besoin d'un PC allumé :
+
+- chaque jour vers **10 h**, GitHub lance la recherche Uber Eats tout seul et publie les offres ;
+- dans l'appli, on choisit le nombre de personnes, l'heure de livraison, le budget, Uber One et le type de repas : le calcul se fait dans le téléphone, instantanément ;
+- le bouton « Commander sur Uber Eats » ouvre le restaurant dans l'appli Uber Eats.
+
+**L'installer comme une vraie appli** : sur iPhone, ouvre le lien dans Safari, touche le bouton Partager puis « Sur l'écran d'accueil ». Sur Android, ouvre-le dans Chrome, menu ⋮ puis « Ajouter à l'écran d'accueil ».
+
+Pour relancer une recherche tout de suite : onglet **Actions** du dépôt GitHub, « Recherche du jour et appli », bouton **Run workflow**.
+
+### Mise en place (une seule fois)
+
+1. Rendre le dépôt public : **Settings → General → Danger Zone → Change visibility**.
+2. Activer GitHub Pages : **Settings → Pages → Source : GitHub Actions**.
+3. Lancer la première recherche : **Actions → Recherche du jour et appli → Run workflow**.
+
+### Tester l'appli sur le PC
+
+```bash
+.venv\Scripts\python -m dailyuber.export --offline --out web/data.json
+```
+
+```bash
+.venv\Scripts\python -m http.server 8765 --directory web
+```
+
+Puis ouvrir http://localhost:8765 dans le navigateur.
+
 ## Installation
 
 Il faut Python 3 sous Windows, lancé avec la commande `py`.
@@ -48,6 +78,8 @@ La première recherche prend environ 3 minutes. Les données sont ensuite gardé
 | `--at HH:MM` | Heure de livraison visée : aujourd'hui, ou demain si l'heure est passée (par défaut : maintenant) |
 | `--on JOUR` | Jour visé avec `--at` : `demain` ou une date `AAAA-MM-JJ` |
 | `--uber-one` / `--no-uber-one` | Calcule les prix avec ou sans l'abonnement Uber One |
+| `--type TYPE …` | Seulement certains types de repas : `burger`, `pizza`, `sushi`, `asiatique`, `poke`, `tacos_kebab`, `sandwich`, `salade`, `pates`, `poulet` |
+| `--budget EUR` | Prix max par personne (par défaut : 10 €) |
 | `--refresh` | Force une nouvelle récupération, même si le cache est récent |
 | `--offline` | Réutilise les dernières données, même si elles sont anciennes |
 | `--config chemin` | Utilise un autre fichier de configuration |
@@ -63,6 +95,7 @@ Tout se règle dans [config.yaml](config.yaml) :
 | `prefilter` | Note minimale et délai de livraison maximal |
 | `fees` | Estimation des frais de livraison et de service, et Uber One (`uber_one.enabled: true` si tu es abonné) |
 | `meal` | Ce qui compte comme un « plat » (prix minimum, mots-clés) |
+| `meal_types` | Les types de repas proposés et leurs mots-clés |
 | `scoring` | Poids du prix, de la note et du délai dans le classement |
 | `fetch` | Nombre de restaurants analysés, délai entre les requêtes, durée du cache |
 
@@ -71,6 +104,8 @@ Tout se règle dans [config.yaml](config.yaml) :
 ```bash
 .venv\Scripts\python -m pytest -q
 ```
+
+L'appli refait le calcul en JavaScript ([web/engine.js](web/engine.js)) : toute modification de `selection.py` ou `hours.py` doit y être reportée. Le test `tests/test_parity.py` (il faut [Node.js](https://nodejs.org)) vérifie que les deux donnent exactement les mêmes offres.
 
 ## À savoir
 
@@ -82,5 +117,5 @@ Tout se règle dans [config.yaml](config.yaml) :
 
 ## Pour aller plus loin
 
-- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (interface graphique, choix de zone, favoris, version téléphone).
+- [ROADMAP.md](ROADMAP.md) : les prochaines étapes (choix de zone, favoris…).
 - [CONTEXT.md](CONTEXT.md) : les détails techniques.

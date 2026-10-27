@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DailyUber</title>
+  <meta name="description" content="Les meilleurs plans pour manger à plusieurs à Aix, frais compris.">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DailyUber">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="nav" id="nav" aria-hidden="true"><span class="nav-title">DailyUber</span></header>
+
+  <main>
+    <section class="hero">
+      <h1 id="title">DailyUber</h1>
+      <p class="subtitle" id="subtitle">Chargement des offres…</p>
+    </section>
+
+    <p class="banner" id="banner" hidden></p>
+
+    <section class="group" aria-label="Réglages">
+      <div class="row">
+        <span class="row-label" id="people-label">Personnes</span>
+        <div class="segmented" id="people" role="radiogroup" aria-labelledby="people-label"></div>
+      </div>
+
+      <div class="row row-stack">
+        <span class="row-label" id="when-label">Livraison</span>
+        <div class="segmented" id="when" role="radiogroup" aria-labelledby="when-label"></div>
+      </div>
+      <div class="row" id="time-row" hidden>
+        <label class="row-label" for="time">Heure</label>
+        <input class="time-pill" type="time" id="time" step="900" value="12:30">
+      </div>
+      <p class="row-hint" id="time-hint" hidden></p>
+
+      <div class="row row-stack">
+        <div class="row-line">
+          <label class="row-label" for="budget">Budget max</label>
+          <span class="row-value" id="budget-value">10 €</span>
+        </div>
+        <input class="slider" type="range" id="budget" min="6" max="15" step="0.5" value="10"
+               aria-describedby="budget-value">
+      </div>
+
+      <div class="row">
+        <label class="row-label" for="uber-one">Uber One
+          <span class="row-caption">Livraison offerte et service réduit dès 12 €</span>
+        </label>
+        <input class="switch" type="checkbox" role="switch" id="uber-one">
+      </div>
+    </section>
+
+    <h2 class="section-title">Type de repas</h2>
+    <div class="chips" id="types" role="group" aria-label="Type de repas"></div>
+
+    <div class="results-head">
+      <h2 class="section-title" id="results-title" aria-live="polite">Offres</h2>
+      <span class="results-caption">Classées par prix, note et rapidité</span>
+    </div>
+    <ol class="results" id="results"></ol>
+
+    <footer class="footer">
+      <p>Prix estimés : Uber Eats n'affiche les frais de service exacts qu'au paiement. Un prix « dès » peut augmenter selon les options choisies.</p>
+      <p>DailyUber est un outil perso, sans lien avec Uber.</p>
+    </footer>
+  </main>
+</body>
+</html>

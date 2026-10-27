@@ -38,6 +38,7 @@ class Store:
     open_until: str = ""                 # "Ouvert jusqu'à 22:00"
     hours: dict[int, list[tuple[int, int]]] | None = None             # voir hours.parse_hours
     delivery_slots: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
+    cuisines: list[str] = field(default_factory=list)  # "Italienne", "Sushis"... (cuisineList)
     items: list[Item] = field(default_factory=list)
 
 

@@ -14,6 +14,7 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
     # Une config antérieure à l'option Uber One reste valable (abonnement désactivé).
     cfg["fees"]["uber_one"] = {"enabled": False, "min_subtotal": 12.0, "service_fee_discount": 0.5,
                                **(cfg["fees"].get("uber_one") or {})}
+    cfg.setdefault("meal_types", {})
     cfg["discord_webhook_url"] = os.environ.get("DISCORD_WEBHOOK_URL", "")
     cfg["storage"]["data_dir"] = str(ROOT / cfg["storage"]["data_dir"])
     return cfg

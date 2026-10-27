@@ -1,4 +1,5 @@
-"""Point d'entrée CLI : python -m dailyuber.main [--refresh | --offline] [--people 1 3 6] [--at 12:30 [--on demain]] [--uber-one]"""
+"""Point d'entrée CLI : python -m dailyuber.main [--refresh | --offline] [--people 1 3 6] [--at 12:30 [--on demain]] [--uber-one]
+                    [--type pizza sushi] [--budget 12]"""
 import argparse
 import logging
 import sys
@@ -20,7 +21,8 @@ def when_label(when: datetime | None) -> str:
 
 
 def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
-        when: datetime | None = None, uber_one: bool | None = None) -> str:
+        when: datetime | None = None, uber_one: bool | None = None,
+        meal_types: list[str] | None = None, budget: float | None = None) -> str:
     if offline:
         raw = engine.load_cached_raw(cfg)
         if raw is None:
@@ -29,7 +31,9 @@ def run(cfg: dict, offline: bool, refresh: bool, people: list[int] | None,
         raw = engine.get_raw(cfg, refresh=refresh)
     stores = engine.build_stores(raw)
     cfg = engine.with_uber_one(cfg, uber_one)
-    deals = engine.select(stores, cfg, people, when)
+    if budget is not None:
+        cfg["selection"]["max_price_per_person"] = budget
+    deals = engine.select(stores, cfg, people, when, meal_types=meal_types)
     if when is None:  # l'historique "nouveau depuis la veille" ne suit que les recherches immédiates
         mark_new_and_save(deals, cfg["storage"]["data_dir"])
     stats = {"address": cfg["address"]["label"], "fetched_at": raw.get("fetched_at", "?"),
@@ -50,14 +54,21 @@ def main() -> int:
     ap.add_argument("--on", metavar="DATE", help="jour visé avec --at : AAAA-MM-JJ ou 'demain' (défaut : prochaine occurrence)")
     ap.add_argument("--uber-one", action=argparse.BooleanOptionalAction, default=None,
                     help="calcule les prix avec (ou sans, --no-uber-one) l'abonnement Uber One (défaut : config.yaml)")
+    ap.add_argument("--type", nargs="+", metavar="TYPE", dest="meal_types",
+                    help="types de repas (meal_types dans config.yaml : burger, pizza, sushi...)")
+    ap.add_argument("--budget", type=float, metavar="EUR", help="prix max par personne (défaut : config.yaml)")
     ap.add_argument("--config", help="chemin vers config.yaml")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
     sys.stdout.reconfigure(encoding="utf-8")
     cfg = load_config(args.config)
+    unknown = set(args.meal_types or []) - set(cfg["meal_types"])
+    if unknown:
+        ap.error(f"type(s) inconnu(s) : {', '.join(sorted(unknown))} (choix : {', '.join(cfg['meal_types'])})")
     try:
         when = resolve_target(args.at, args.on, datetime.now(PARIS))
-        print(run(cfg, args.offline, args.refresh, args.people, when, args.uber_one))
+        print(run(cfg, args.offline, args.refresh, args.people, when, args.uber_one,
+                  args.meal_types, args.budget))
     except Exception:
         log.exception("Échec du run")
         return 1

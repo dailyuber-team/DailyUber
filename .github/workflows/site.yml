@@ -1,0 +1,134 @@
+# Recherche Uber Eats du jour (vers 10 h, heure de Paris) et publication de l'appli sur GitHub Pages.
+#
+# - schedule : une nouvelle recherche par jour, à partir de 10 h à Paris, puis publication ;
+# - push sur main (appli ou moteur modifiés) : republication avec la dernière recherche,
+#   gardée en cache par GitHub ; nouvelle recherche seulement si elle a plus de 24 h ;
+# - workflow_dispatch (bouton "Run workflow" de l'onglet Actions) : force une nouvelle recherche.
+name: Recherche du jour et appli
+
+on:
+  schedule:
+    - cron: "0 8 * * *"   # 10 h à Paris en heure d'été (9 h en hiver : ignoré)
+    - cron: "0 9 * * *"   # 10 h à Paris en heure d'hiver (11 h en été : déjà fait, ignoré)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["web/**", "dailyuber/**", "config.yaml", "requirements.txt", ".github/workflows/site.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Reprendre la dernière recherche
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+
+      - name: Décider s'il faut une nouvelle recherche
+        id: plan
+        run: |
+          python - <<'EOF'
+          import gzip, json, os
+          from datetime import datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          paris = ZoneInfo("Europe/Paris")
+          now = datetime.now(paris)
+          raw = Path("data/raw/latest.json.gz")
+          last = None
+          if raw.exists():
+              last = datetime.fromisoformat(json.loads(gzip.decompress(raw.read_bytes()))["fetched_at"]).astimezone(paris)
+          event = os.environ["GITHUB_EVENT_NAME"]
+          if event == "workflow_dispatch":
+              fetch, publish = True, True
+          elif event == "schedule":
+              fetch = now.hour >= 10 and (last is None or last.date() < now.date())
+              publish = fetch
+          else:  # push
+              fetch = last is None or (now - last).total_seconds() > 24 * 3600
+              publish = True
+          print(f"Paris : {now:%d/%m %H:%M}, dernière recherche : {last and f'{last:%d/%m %H:%M}'}, "
+                f"nouvelle recherche : {fetch}, publication : {publish}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"fetch={str(fetch).lower()}\npublish={str(publish).lower()}\n")
+          EOF
+
+      - name: Installer Chromium
+        if: steps.plan.outputs.fetch == 'true'
+        run: python -m playwright install --with-deps chromium
+
+      - name: Rechercher les offres sur Uber Eats
+        if: steps.plan.outputs.fetch == 'true'
+        run: python -m dailyuber.export --refresh --out _site/data.json
+
+      - name: Garder la recherche pour les prochaines publications
+        if: steps.plan.outputs.fetch == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+
+      - name: Exporter la dernière recherche
+        if: steps.plan.outputs.fetch != 'true' && steps.plan.outputs.publish == 'true'
+        run: python -m dailyuber.export --offline --out _site/data.json
+
+      - name: Tests (dont la parité Python / appli sur les données du jour)
+        id: tests
+        if: steps.plan.outputs.publish == 'true'
+        continue-on-error: true
+        run: python -m pytest -q
+
+      - name: Assembler le site
+        if: steps.plan.outputs.publish == 'true'
+        run: cp -r web/. _site/ && ls -la _site
+
+      - uses: actions/configure-pages@v5
+        if: steps.plan.outputs.publish == 'true'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.plan.outputs.publish == 'true'
+        with:
+          path: _site
+
+      - name: Publier
+        id: deploy
+        if: steps.plan.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4
+
+      # Les offres du jour sont publiées même si un test échoue (mieux que des prix d'hier),
+      # mais le run est marqué en échec pour qu'on le voie.
+      - name: Signaler un test en échec
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::Des tests ont échoué : l'appli peut afficher des prix différents du moteur Python."
+          exit 1

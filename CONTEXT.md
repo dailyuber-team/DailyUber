@@ -84,6 +84,12 @@ DailyUber/
   data/raw/latest.json.gz  # dernière récupération brute (cache, permet --offline)
 ```
 
+**Appli mobile (branche `app-mobile`)** : PWA statique dans `web/` (index.html, style.css, app.js, engine.js, sw.js, manifest, icônes), publiée sur GitHub Pages par `.github/workflows/site.yml`.
+- Chaque jour vers 10 h (Paris), GitHub Actions lance la recherche (`python -m dailyuber.export --refresh`), garde la récupération brute dans le cache d'Actions, et publie `data.json` (plats principaux seulement, types de repas précalculés, frais, promos, horaires).
+- Le téléphone recalcule les offres en JavaScript (`web/engine.js`, portage fidèle de `selection.py` et `hours.availability`, y compris l'arrondi de Python) : personnes 1 à 6, heure (maintenant / aujourd'hui / demain), budget, Uber One, types de repas. **Toute modification de selection.py ou hours.py doit être reportée dans engine.js** ; `tests/test_parity.py` (Node.js requis) compare les deux sur des données aléatoires et sur la dernière récupération réelle.
+- Types de repas : `meal_types` dans config.yaml (mots-clés du plat, sinon `cuisineList` du restaurant) ; CLI `--type` et `--budget`.
+- Choix de l'utilisatrice : dépôt public + GitHub Pages, noir et blanc, thème clair/sombre selon le téléphone. Risque à surveiller : Uber peut bloquer les adresses IP de GitHub.
+
 **Lancer** (52 tests : `.venv\Scripts\python -m pytest -q`) :
 - `.venv\Scripts\python -m dailyuber.main` : utilise le cache s'il a moins de 30 min, sinon récupère (environ 3 min pour 40 menus).
 - `--refresh` : force une nouvelle récupération ; `--offline` : utilise le cache quel que soit son âge.
